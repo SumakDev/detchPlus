@@ -1,28 +1,51 @@
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+"use client";
 
-export default function LoginPage() {
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+interface LoginModalProps {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+}
+
+export default function LoginModal({ open, setOpen }: LoginModalProps) {
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <Card className="w-full max-w-md shadow-2xl rounded-2xl">
-        <CardContent className="p-6">
-          <h1 className="text-2xl font-bold text-center mb-6">Sistema de Ventas</h1>
-          <form className="space-y-4">
-            <div>
-              <Label htmlFor="usuario">Usuario</Label>
-              <Input id="usuario" placeholder="Ingresa tu usuario" />
-            </div>
-            <div>
-              <Label htmlFor="password">Contraseña</Label>
-              <Input id="password" type="password" placeholder="••••••••" />
-            </div>
-            <Button className="w-full">Ingresar</Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}   
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Iniciar Sesión</DialogTitle>
+          <DialogDescription>
+            Ingresa tus credenciales para acceder al sistema.
+          </DialogDescription>
+        </DialogHeader>
 
+        <form className="space-y-4">
+          <div>
+            <Label htmlFor="usuario">Usuario</Label>
+            <Input id="usuario" type="text" placeholder="Tu usuario" />
+          </div>
+
+          <div>
+            <Label htmlFor="password">Contraseña</Label>
+            <Input id="password" type="password" placeholder="••••••••" />
+          </div>
+
+          <DialogFooter>
+            <Button type="submit" className="w-full">
+              Ingresar
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
