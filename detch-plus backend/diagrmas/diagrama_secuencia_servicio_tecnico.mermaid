@@ -1,0 +1,67 @@
+sequenceDiagram
+    participant C as Cliente
+    participant R as Recepcionista
+    participant S as Sistema
+    participant BD as Base de Datos
+    participant T as Técnico
+    participant N as Notificación
+    
+    C->>R: Trae dispositivo para reparación
+    R->>S: Registra recepción de servicio
+    S->>BD: INSERT INTO SERVICIO_TECNICO (id_tec, ced_cli, ...)
+    BD-->>S: Número de servicio generado
+    
+    R->>S: Registra detalles del dispositivo
+    S->>BD: INSERT INTO DETALLE_SERVICIO (imei_tel, problema_reportado, ...)
+    BD-->>S: Confirmación
+    
+    S-->>R: Número de servicio y recibo
+    R->>C: Entrega comprobante de recepción
+    
+    R->>T: Asigna servicio a técnico
+    T->>S: Inicia diagnóstico
+    S->>BD: UPDATE SERVICIO_TECNICO SET estado_servicio='EN_PROCESO'
+    BD-->>S: Estado actualizado
+    
+    T->>S: Registra diagnóstico
+    S->>BD: UPDATE DETALLE_SERVICIO SET solucion_aplicada='...'
+    BD-->>S: Diagnóstico guardado
+    
+    T->>C: Comunica diagnóstico y cotización
+    
+    alt Cliente acepta reparación
+        C->>T: Autoriza reparación
+        T->>S: Inicia reparación
+        S->>BD: INSERT INTO OBSERVACIONES (tipo='SERVICIO', descripcion='Reparación autorizada')
+        
+        T->>S: Termina reparación
+        S->>BD: UPDATE SERVICIO_TECNICO SET estado_servicio='TERMINADO'
+        BD-->>S: Estado actualizado
+        
+        S->>N: Notifica cliente que está listo
+        N->>C: SMS/Email de dispositivo listo
+        
+        C->>R: Viene a retirar
+        R->>S: Verifica estado del servicio
+        S->>BD: SELECT * FROM SERVICIO_TECNICO WHERE num_ser=...
+        BD-->>S: Datos del servicio
+        
+        alt Pago realizado
+            R->>S: Procesa pago del servicio
+            S->>BD: UPDATE SERVICIO_TECNICO SET estado_servicio='ENTREGADO'
+            BD-->>S: Servicio marcado como entregado
+            R->>C: Entrega dispositivo reparado
+        else Pago pendiente
+            R->>C: Solicita pago antes de entrega
+        end
+        
+    else Cliente rechaza reparación
+        C->>T: No autoriza reparación
+        T->>S: Marca como no reparado
+        S->>BD: UPDATE SERVICIO_TECNICO SET estado_servicio='TERMINADO'
+        S->>BD: INSERT INTO OBSERVACIONES (descripcion='Cliente no autorizó reparación')
+        BD-->>S: Confirmación
+        
+        S->>N: Notifica para retiro
+        N->>C: Dispositivo listo para retiro (sin reparar)
+    end

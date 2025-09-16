@@ -1,0 +1,61 @@
+sequenceDiagram
+    participant U as Usuario
+    participant W as Web App
+    participant S as Sistema
+    participant BD as Base de Datos
+    participant P as Pasarela de Pago
+    
+    U->>W: Navega catálogo de productos
+    W->>S: Solicita productos disponibles
+    S->>BD: SELECT * FROM v_productos_tienda_online
+    BD-->>S: Lista de productos con stock y precios
+    S-->>W: Productos disponibles
+    W-->>U: Muestra catálogo
+    
+    U->>W: Selecciona producto y cantidad
+    W->>S: Agregar al carrito
+    S->>BD: CALL sp_agregar_carrito(id_usuario, id_producto, cantidad)
+    BD->>BD: Verifica stock disponible
+    BD->>BD: INSERT/UPDATE CARRITO_COMPRAS
+    BD-->>S: Resultado de operación
+    S-->>W: Confirmación
+    W-->>U: Producto agregado al carrito
+    
+    loop Agregar más productos
+        U->>W: Continúa comprando
+        Note over U,W: Repite proceso anterior
+    end
+    
+    U->>W: Finalizar compra
+    W->>S: Procesar pedido
+    S->>BD: CALL sp_procesar_pedido(id_usuario, direccion, metodo_pago, cupon)
+    
+    BD->>BD: Calcula subtotal del carrito
+    BD->>BD: Aplica descuentos si hay cupón válido
+    BD->>BD: Calcula impuestos (15% IVA)
+    BD->>BD: INSERT INTO PEDIDOS_ONLINE
+    BD->>BD: INSERT INTO DETALLE_PEDIDO_ONLINE
+    BD->>BD: TRIGGER: Actualiza stock reservado
+    BD->>BD: TRIGGER: Limpia carrito
+    BD-->>S: ID del pedido y total
+    
+    S->>P: Procesa pago
+    P-->>S: Respuesta del pago
+    
+    alt Pago exitoso
+        S->>BD: UPDATE PEDIDOS_ONLINE SET estado_pago='PAGADO'
+        BD->>BD: Confirma stock y actualiza inventario
+        BD-->>S: Confirmación
+        S-->>W: Pedido confirmado
+        W-->>U: Confirmación de compra y seguimiento
+        
+        S->>BD: INSERT INTO NOTIFICACIONES (confirmación de pedido)
+        S->>U: Envía email de confirmación
+        
+    else Pago fallido
+        S->>BD: UPDATE PEDIDOS_ONLINE SET estado_pago='FALLIDO'
+        BD->>BD: Libera stock reservado
+        BD-->>S: Stock liberado
+        S-->>W: Error en pago
+        W-->>U: Error, intenta nuevamente
+    end

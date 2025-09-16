@@ -1,0 +1,52 @@
+sequenceDiagram
+    participant C as Cliente
+    participant E as Empleado
+    participant S as Sistema
+    participant BD as Base de Datos
+    participant I as Inventario
+    
+    C->>E: Solicita producto
+    E->>S: Busca producto en sistema
+    S->>BD: SELECT * FROM v_productos_stock WHERE modelo LIKE '%...'
+    BD-->>S: Datos del producto y stock
+    S-->>E: Muestra información del producto
+    
+    alt Stock disponible
+        E->>S: Verifica precio actual
+        S->>BD: SELECT valor FROM PRECIOS WHERE tipo_precio='VENTA' AND activo=TRUE
+        BD-->>S: Precio vigente
+        S-->>E: Muestra precio
+        
+        E->>C: Informa precio y disponibilidad
+        C->>E: Confirma compra
+        
+        E->>S: Inicia proceso de venta
+        S->>BD: INSERT INTO FACTURAS (ced_cli, ced_emp, ...)
+        BD-->>S: Número de factura generado
+        
+        E->>S: Agrega productos a factura
+        S->>BD: INSERT INTO DETALLE_FACTURA (num_fac, id_pro, can_pro, ...)
+        BD->>BD: TRIGGER: Actualiza stock automáticamente
+        BD->>BD: TRIGGER: Calcula total de factura
+        BD-->>S: Confirmación
+        
+        S->>I: Actualiza inventario
+        I-->>S: Stock actualizado
+        
+        S-->>E: Factura generada exitosamente
+        E->>C: Entrega producto y factura
+        
+    else Stock insuficiente
+        S-->>E: Producto no disponible
+        E->>C: Informa falta de stock
+        
+        opt Cliente acepta parte de pago
+            E->>S: Inicia evaluación de parte de pago
+            S->>BD: INSERT INTO EVALUACION_PARTE_PAGO
+            BD-->>S: Evaluación registrada
+            E->>C: Evalúa dispositivo del cliente
+            E->>S: Registra valor evaluado
+            S->>BD: UPDATE EVALUACION_PARTE_PAGO SET valor_evaluado=..., estado_eval='APROBADO'
+            BD-->>S: Confirmación
+        end
+    end

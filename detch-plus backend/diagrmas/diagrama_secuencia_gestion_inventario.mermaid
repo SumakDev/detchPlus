@@ -1,0 +1,83 @@
+sequenceDiagram
+    participant E as Empleado
+    participant S as Sistema
+    participant BD as Base de Datos
+    participant P as Proveedor
+    participant I as Inventario
+    
+    Note over E,I: Proceso de Ingreso de Productos Nuevos
+    
+    E->>S: Registra nuevo producto
+    S->>BD: INSERT INTO PRODUCTOS (codigo_barras, modelo, origen='COMPRA_NUEVA', ...)
+    BD-->>S: ID del producto generado
+    
+    E->>S: Registra detalles específicos
+    alt Es teléfono
+        S->>BD: INSERT INTO DETALLE_TELEFONOS (color, almacenamiento, ...)
+    else Es reloj
+        S->>BD: INSERT INTO DETALLE_RELOJES (tamaño, tipo, ...)
+    else Es consola
+        S->>BD: INSERT INTO DETALLE_CONSOLAS (capacidad, num_controles, ...)
+    end
+    BD-->>S: Detalles registrados
+    
+    E->>S: Establece precios
+    S->>BD: INSERT INTO PRECIOS (tipo_precio='COMPRA', valor=...)
+    S->>BD: INSERT INTO PRECIOS (tipo_precio='VENTA', valor=...)
+    BD-->>S: Precios establecidos
+    
+    E->>S: Registra stock inicial
+    S->>BD: INSERT INTO STOCK (cantidad_disponible, ubicacion, ...)
+    BD-->>S: Stock registrado
+    
+    S->>BD: INSERT INTO MOVIMIENTOS_INVENTARIO (tipo_mov='ENTRADA', ...)
+    BD-->>S: Movimiento registrado
+    
+    Note over E,I: Proceso de Parte de Pago
+    
+    E->>S: Cliente trae dispositivo como parte de pago
+    S->>BD: INSERT INTO EVALUACION_PARTE_PAGO (ced_cli, valor_evaluado, ...)
+    BD-->>S: Evaluación registrada
+    
+    E->>S: Aprueba evaluación
+    S->>BD: UPDATE EVALUACION_PARTE_PAGO SET estado_eval='APROBADO'
+    BD-->>S: Evaluación aprobada
+    
+    E->>S: Registra dispositivo en inventario
+    S->>BD: INSERT INTO PRODUCTOS (origen='PARTE_PAGO', estado='USADO_BUENO', ...)
+    BD-->>S: Producto registrado
+    
+    S->>BD: INSERT INTO STOCK (cantidad_disponible=1, ...)
+    S->>BD: INSERT INTO MOVIMIENTOS_INVENTARIO (tipo_mov='ENTRADA', motivo='Parte de pago')
+    BD-->>S: Inventario actualizado
+    
+    Note over E,I: Proceso de Ajuste de Inventario
+    
+    E->>S: Realiza conteo físico
+    S->>BD: SELECT * FROM v_productos_stock
+    BD-->>S: Stock actual en sistema
+    
+    E->>S: Reporta diferencias encontradas
+    loop Para cada producto con diferencia
+        E->>S: Ajusta cantidad
+        S->>BD: INSERT INTO MOVIMIENTOS_INVENTARIO (tipo_mov='AJUSTE', cantidad=diferencia)
+        S->>BD: UPDATE STOCK SET cantidad_disponible=nueva_cantidad
+        BD-->>S: Stock ajustado
+    end
+    
+    Note over E,I: Control de Stock Mínimo
+    
+    S->>BD: SELECT * FROM STOCK WHERE cantidad_disponible <= stock_minimo
+    BD-->>S: Productos con stock bajo
+    
+    alt Hay productos con stock bajo
+        S->>BD: INSERT INTO NOTIFICACIONES (tipo='WARNING', mensaje='Stock bajo')
+        S->>E: Notifica productos a reabastecer
+        
+        E->>P: Solicita reabastecimiento
+        P-->>E: Confirma envío
+        
+        E->>S: Registra orden de compra esperada
+        S->>BD: INSERT INTO OBSERVACIONES (tipo='GENERAL', descripcion='Reabastecimiento en camino')
+        BD-->>S: Observación registrada
+    end

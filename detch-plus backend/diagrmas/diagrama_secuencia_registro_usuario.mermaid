@@ -1,0 +1,123 @@
+sequenceDiagram
+    participant U as Usuario
+    participant W as Web App
+    participant S as Sistema
+    participant BD as Base de Datos
+    participant E as Email Service
+    participant A as Auth Service
+    
+    Note over U,A: Proceso de Registro
+    
+    U->>W: Llena formulario de registro
+    W->>S: Envía datos de registro
+    S->>BD: Verifica si email/username existe
+    BD-->>S: Resultado de verificación
+    
+    alt Usuario no existe
+        S->>S: Genera token de verificación
+        S->>S: Hash de contraseña
+        S->>BD: INSERT INTO USUARIOS (username, email, password_hash, token_verificacion, ...)
+        BD-->>S: Usuario registrado con ID
+        
+        S->>BD: INSERT INTO CLIENTES (si es cliente nuevo)
+        BD-->>S: Cliente registrado
+        
+        S->>E: Envía email de verificación
+        E-->>U: Email con enlace de verificación
+        
+        S-->>W: Registro exitoso
+        W-->>U: Mensaje: "Verifica tu email"
+        
+        U->>W: Hace clic en enlace de verificación
+        W->>S: Valida token de verificación
+        S->>BD: UPDATE USUARIOS SET email_verificado=TRUE, estado='ACTIVO' WHERE token_verificacion=...
+        BD-->>S: Email verificado
+        S-->>W: Cuenta activada
+        W-->>U: Bienvenida, cuenta activada
+        
+    else Usuario ya existe
+        S-->>W: Error: Usuario/Email ya existe
+        W-->>U: Mensaje de error
+    end
+    
+    Note over U,A: Proceso de Login
+    
+    U->>W: Ingresa credenciales
+    W->>S: Envía username/email y password
+    S->>BD: SELECT * FROM USUARIOS WHERE username=... OR email=...
+    BD-->>S: Datos del usuario (si existe)
+    
+    alt Usuario existe y está activo
+        S->>S: Verifica hash de contraseña
+        
+        alt Contraseña correcta
+            S->>S: Genera token de sesión
+            S->>BD: INSERT INTO SESIONES_USUARIO (id_sesion, id_usuario, ip_address, ...)
+            S->>BD: UPDATE USUARIOS SET fecha_ultimo_login=NOW(), intentos_fallidos=0
+            BD-->>S: Sesión creada
+            
+            S->>BD: INSERT INTO LOG_ACTIVIDADES (accion='LOGIN', descripcion='Inicio de sesión exitoso')
+            BD-->>S: Log registrado
+            
+            S-->>W: Token de sesión y datos de usuario
+            W-->>U: Login exitoso, redirect a dashboard
+            
+        else Contraseña incorrecta
+            S->>BD: UPDATE USUARIOS SET intentos_fallidos = intentos_fallidos + 1
+            BD-->>S: Intentos actualizados
+            
+            S->>BD: SELECT intentos_fallidos FROM USUARIOS WHERE id_usuario=...
+            BD-->>S: Número de intentos
+            
+            alt Intentos >= 5
+                S->>BD: UPDATE USUARIOS SET estado='BLOQUEADO', fecha_bloqueo=NOW()
+                BD-->>S: Usuario bloqueado
+                S-->>W: Cuenta bloqueada por seguridad
+                W-->>U: Error: Cuenta bloqueada
+            else Intentos < 5
+                S-->>W: Contraseña incorrecta
+                W-->>U: Error: Credenciales inválidas
+            end
+        end
+        
+    else Usuario no existe o está inactivo
+        S-->>W: Credenciales inválidas
+        W-->>U: Error: Usuario/contraseña incorrectos
+    end
+    
+    Note over U,A: Recuperación de Contraseña
+    
+    U->>W: Solicita recuperar contraseña
+    W->>S: Envía email para recuperación
+    S->>BD: SELECT * FROM USUARIOS WHERE email=...
+    BD-->>S: Datos del usuario
+    
+    alt Usuario existe
+        S->>S: Genera token de reset
+        S->>BD: UPDATE USUARIOS SET token_reset_password=...
+        BD-->>S: Token guardado
+        
+        S->>E: Envía email con enlace de reset
+        E-->>U: Email con enlace de recuperación
+        
+        U->>W: Hace clic en enlace
+        W->>S: Valida token de reset
+        S->>BD: SELECT * FROM USUARIOS WHERE token_reset_password=...
+        BD-->>S: Token válido
+        
+        S-->>W: Token válido, mostrar formulario
+        W-->>U: Formulario para nueva contraseña
+        
+        U->>W: Ingresa nueva contraseña
+        W->>S: Envía nueva contraseña
+        S->>S: Hash de nueva contraseña
+        S->>BD: UPDATE USUARIOS SET password_hash=..., token_reset_password=NULL
+        BD-->>S: Contraseña actualizada
+        
+        S-->>W: Contraseña cambiada exitosamente
+        W-->>U: Contraseña actualizada, puede hacer login
+        
+    else Usuario no existe
+        S-->>W: Si existe una cuenta, recibirás un email
+        W-->>U: Mensaje genérico por seguridad
+    end
