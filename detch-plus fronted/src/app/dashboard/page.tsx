@@ -1,155 +1,219 @@
 "use client";
 
-import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useState, useEffect, useMemo } from "react";
+import Layout from "@/components/Layout";
+import ClientForm from "@/components/ClientForm";
+import ClientTable from "@/components/ClientTable";
+import StatsCards from "@/components/statsCards";
+import SearchBar from "@/components/SearchBar";
+import { Cliente, ClienteFormData } from "@/types/client";
 
-export default function App() {
+export default function ClientesPage() {
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
+  const [viewingCliente, setViewingCliente] = useState<Cliente | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filters, setFilters] = useState({ dificultad: "all", activo: "all" });
+
+  // Datos de ejemplo
+  useEffect(() => {
+    const clientesEjemplo: Cliente[] = [
+      {
+        CED_CLI: "1234567890",
+        NOM_CLI: "Juan",
+        APE_CLI: "Pérez",
+        DIR_CLI: "Av. Principal 123",
+        COR_CLI: "juan.perez@email.com",
+        NUM_CLI: "0999999999",
+        DIF_CLI: "MEDIA",
+        ACTIVO: true,
+        FECHA_REGISTRO: "2024-01-15T10:30:00Z"
+      },
+      {
+        CED_CLI: "0987654321",
+        NOM_CLI: "María",
+        APE_CLI: "González",
+        DIR_CLI: "Calle Secundaria 456",
+        COR_CLI: "maria.gonzalez@email.com",
+        NUM_CLI: "0988888888",
+        DIF_CLI: "BAJA",
+        ACTIVO: true,
+        FECHA_REGISTRO: "2024-02-20T14:15:00Z"
+      },
+      {
+        CED_CLI: "1122334455",
+        NOM_CLI: "Carlos",
+        APE_CLI: "Rodriguez",
+        DIR_CLI: "",
+        COR_CLI: "",
+        NUM_CLI: "0977777777",
+        DIF_CLI: "ALTA",
+        ACTIVO: false,
+        FECHA_REGISTRO: "2024-03-10T09:45:00Z"
+      }
+    ];
+    setClientes(clientesEjemplo);
+  }, []);
+
+  // Resto de la lógica...
+  const filteredClientes = useMemo(() => {
+    return clientes.filter((cliente) => {
+      const matchesSearch = 
+        cliente.NOM_CLI.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        cliente.APE_CLI.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        cliente.CED_CLI.includes(searchTerm) ||
+        (cliente.COR_CLI && cliente.COR_CLI.toLowerCase().includes(searchTerm.toLowerCase()));
+
+      const matchesDificultad = filters.dificultad === "all" || cliente.DIF_CLI === filters.dificultad;
+      const matchesActivo = filters.activo === "all" || 
+        (filters.activo === "true" && cliente.ACTIVO) ||
+        (filters.activo === "false" && !cliente.ACTIVO);
+
+      return matchesSearch && matchesDificultad && matchesActivo;
+    });
+  }, [clientes, searchTerm, filters]);
+
+  const handleCreateCliente = (data: ClienteFormData) => {
+    const nuevoCliente: Cliente = {
+      ...data,
+      FECHA_REGISTRO: new Date().toISOString()
+    };
+    setClientes(prev => [...prev, nuevoCliente]);
+    setShowForm(false);
+  };
+
+  const handleUpdateCliente = (data: ClienteFormData) => {
+    if (!editingCliente) return;
+    setClientes(prev => 
+      prev.map(cliente => 
+        cliente.CED_CLI === editingCliente.CED_CLI 
+          ? { ...cliente, ...data }
+          : cliente
+      )
+    );
+    setEditingCliente(null);
+  };
+
+  const handleDeleteCliente = (cedula: string) => {
+    if (confirm("¿Estás seguro de que deseas eliminar este cliente?")) {
+      setClientes(prev => prev.filter(cliente => cliente.CED_CLI !== cedula));
+    }
+  };
+
+  const handleExport = () => {
+    const csv = [
+      ['Cédula', 'Nombre', 'Apellido', 'Correo', 'Teléfono', 'Estado', 'Dificultad'],
+      ...filteredClientes.map(cliente => [
+        cliente.CED_CLI,
+        cliente.NOM_CLI,
+        cliente.APE_CLI,
+        cliente.COR_CLI || '',
+        cliente.NUM_CLI || '',
+        cliente.ACTIVO ? 'Activo' : 'Inactivo',
+        cliente.DIF_CLI
+      ])
+    ].map(row => row.join(',')).join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'clientes.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const stats = {
+    total: clientes.length,
+    activos: clientes.filter(c => c.ACTIVO).length,
+    inactivos: clientes.filter(c => !c.ACTIVO).length,
+    nuevosEsteMes: clientes.filter(c => {
+      const fecha = new Date(c.FECHA_REGISTRO);
+      const hoy = new Date();
+      return fecha.getMonth() === hoy.getMonth() && fecha.getFullYear() === hoy.getFullYear();
+    }).length,
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100 flex">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white shadow-md p-4 space-y-4" aria-label="Sidebar">
-        <h2 className="text-xl font-bold mb-4">Sistema iPhone</h2>
-        <nav className="space-y-2" aria-label="Main navigation">
-          <Link href="/dashboard" className="block p-2 rounded hover:bg-gray-200">
-            Dashboard
-          </Link>
+    <Layout>
+      {/* Container sin padding extra */}
+      <div className="space-y-4 max-w-7xl mx-auto"> {/* Reducido de space-y-6 a space-y-4 */}
+        
+        {/* Header compacto */}
+        <div className="mb-4"> {/* Añadido mb-4 para control específico */}
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Gestión de Clientes</h1> {/* Reducido de text-3xl */}
+          <p className="text-gray-600 text-sm">Administra la información de tus clientes</p>
+        </div>
 
-          <Link href="/stock" className="block p-2 rounded hover:bg-gray-200">
-          stock
-          </Link>
+        {/* Estadísticas */}
+        <StatsCards 
+          totalClientes={stats.total}
+          clientesActivos={stats.activos}
+          clientesInactivos={stats.inactivos}
+          nuevosEsteMes={stats.nuevosEsteMes}
+        />
 
-          <Link href="/ventas" className="block p-2 rounded hover:bg-gray-200">
-            Ventas
-          </Link>
+        {/* Barra de búsqueda y filtros */}
+        <SearchBar
+          onSearch={setSearchTerm}
+          onFilterChange={setFilters}
+          onExport={handleExport}
+          onAddClient={() => setShowForm(true)}
+          totalResults={filteredClientes.length}
+        />
 
-          <Link href="/clientes" className="block p-2 rounded hover:bg-gray-200">
-            Clientes
-          </Link>
+        {/* Formulario */}
+        {(showForm || editingCliente) && (
+          <ClientForm
+            cliente={editingCliente || undefined}
+            onSubmit={editingCliente ? handleUpdateCliente : handleCreateCliente}
+            onCancel={() => {
+              setShowForm(false);
+              setEditingCliente(null);
+            }}
+            isEditing={!!editingCliente}
+          />
+        )}
 
-          <Link href="/reportes" className="block p-2 rounded hover:bg-gray-200">
-            Reportes
-          </Link>
-        </nav>
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 p-6 space-y-6">
-        {/* Dashboard */}
-        <section id="dashboard">
-          <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
-          <div className="grid grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-gray-500">iPhones en stock</p>
-                <p className="text-2xl font-bold">150</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-gray-500">Ventas hoy</p>
-                <p className="text-2xl font-bold">$2,500</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-gray-500">Clientes nuevos</p>
-                <p className="text-2xl font-bold">5</p>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
-
-        {/* Stock */}
-        <section id="stock">
-          <h1 className="text-xl font-semibold mb-2">Gestión de Stock</h1>
-          <Button className="mb-4">Agregar iPhone</Button>
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white shadow rounded-lg">
-              <thead>
-                <tr className="bg-gray-200 text-left">
-                  <th className="p-2">Modelo</th>
-                  <th className="p-2">Color</th>
-                  <th className="p-2">Capacidad</th>
-                  <th className="p-2">Precio</th>
-                  <th className="p-2">Cantidad</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="p-2">iPhone 15</td>
-                  <td className="p-2">Azul</td>
-                  <td className="p-2">128 GB</td>
-                  <td className="p-2">$1200</td>
-                  <td className="p-2">10</td>
-                </tr>
-                <tr>
-                  <td className="p-2">iPhone 14</td>
-                  <td className="p-2">Negro</td>
-                  <td className="p-2">256 GB</td>
-                  <td className="p-2">$1100</td>
-                  <td className="p-2">5</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* Ventas */}
-        <section id="ventas">
-          <h1 className="text-xl font-semibold mb-2">Gestión de Ventas</h1>
-          <form className="space-y-4 bg-white p-4 shadow rounded">
-            <div>
-              <Label>Cliente</Label>
-              <Input placeholder="Seleccionar Cliente" />
+        {/* Vista detallada del cliente */}
+        {viewingCliente && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-xl font-semibold">Detalles del Cliente</h3>
+                <button 
+                  onClick={() => setViewingCliente(null)}
+                  className="text-gray-400 hover:text-gray-600 text-xl font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div><strong>Cédula/RUC:</strong> {viewingCliente.CED_CLI}</div>
+                <div><strong>Nombre:</strong> {viewingCliente.NOM_CLI} {viewingCliente.APE_CLI}</div>
+                <div><strong>Correo:</strong> {viewingCliente.COR_CLI || "No especificado"}</div>
+                <div><strong>Teléfono:</strong> {viewingCliente.NUM_CLI || "No especificado"}</div>
+                <div><strong>Dirección:</strong> {viewingCliente.DIR_CLI || "No especificada"}</div>
+                <div><strong>Dificultad:</strong> {viewingCliente.DIF_CLI}</div>
+                <div><strong>Estado:</strong> {viewingCliente.ACTIVO ? "Activo" : "Inactivo"}</div>
+                <div><strong>Fecha de Registro:</strong> {new Date(viewingCliente.FECHA_REGISTRO).toLocaleDateString()}</div>
+              </div>
             </div>
-            <div>
-              <Label>Producto</Label>
-              <Input placeholder="iPhone 15 - 128GB" />
-            </div>
-            <div>
-              <Label>Cantidad</Label>
-              <Input type="number" placeholder="1" />
-            </div>
-            <p className="text-right font-bold">Total: $3,500</p>
-            <Button>Generar Factura</Button>
-          </form>
-        </section>
-
-        {/* Clientes */}
-        <section id="clientes">
-          <h1 className="text-xl font-semibold mb-2">Gestión de Clientes</h1>
-          <Button className="mb-4">Agregar Cliente</Button>
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white shadow rounded-lg">
-              <thead>
-                <tr className="bg-gray-200 text-left">
-                  <th className="p-2">Nombre</th>
-                  <th className="p-2">Cédula/RUC</th>
-                  <th className="p-2">Teléfono</th>
-                  <th className="p-2">Correo</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="p-2">Juan Pérez</td>
-                  <td className="p-2">1234567890</td>
-                  <td className="p-2">099999999</td>
-                  <td className="p-2">jp@mail.com</td>
-                </tr>
-                <tr>
-                  <td className="p-2">María Gómez</td>
-                  <td className="p-2">0987654321</td>
-                  <td className="p-2">098888888</td>
-                  <td className="p-2">mg@mail.com</td>
-                </tr>
-              </tbody>
-            </table>
           </div>
-        </section>
-      </main>
-    </div>
+        )}
+
+        {/* Tabla de clientes */}
+        {!showForm && !editingCliente && (
+          <ClientTable
+            clientes={filteredClientes}
+            onEdit={setEditingCliente}
+            onDelete={handleDeleteCliente}
+            onView={setViewingCliente}
+          />
+        )}
+      </div>
+    </Layout>
   );
 }

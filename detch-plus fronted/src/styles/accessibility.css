@@ -1,0 +1,240 @@
+/* Estilos de accesibilidad según ISO 9241-11 e ISO 14289 */
+
+/* Variables CSS para consistencia */
+:root {
+  --focus-ring: 0 0 0 2px rgba(59, 130, 246, 0.5);
+  --focus-ring-offset: 0 0 0 2px white, 0 0 0 4px rgba(59, 130, 246, 0.5);
+  --error-color: #dc2626;
+  --success-color: #16a34a;
+  --warning-color: #ca8a04;
+  
+  /* Variables de accesibilidad */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --border-color: #d1d5db;
+  --accessibility-font-size: 16px;
+}
+
+/* Configuraciones de tamaño de fuente */
+.font-size-small,
+.font-size-small * {
+  font-size: 14px !important;
+}
+
+.font-size-medium,
+.font-size-medium * {
+  font-size: 16px !important;
+}
+
+.font-size-large,
+.font-size-large * {
+  font-size: 18px !important;
+}
+
+/* Excepciones para elementos específicos */
+.font-size-small h1,
+.font-size-medium h1,
+.font-size-large h1 {
+  font-size: calc(var(--accessibility-font-size) * 2) !important;
+}
+
+.font-size-small h2,
+.font-size-medium h2,
+.font-size-large h2 {
+  font-size: calc(var(--accessibility-font-size) * 1.5) !important;
+}
+
+.font-size-small h3,
+.font-size-medium h3,
+.font-size-large h3 {
+  font-size: calc(var(--accessibility-font-size) * 1.25) !important;
+}
+
+/* Alto contraste */
+.high-contrast {
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+.high-contrast *,
+.high-contrast *:before,
+.high-contrast *:after {
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Elementos específicos en alto contraste */
+.high-contrast input,
+.high-contrast select,
+.high-contrast textarea {
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+  border: 2px solid var(--border-color) !important;
+}
+
+.high-contrast button {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 2px solid var(--border-color) !important;
+}
+
+.high-contrast button:hover {
+  background-color: var(--text-primary) !important;
+  color: var(--bg-primary) !important;
+}
+
+.high-contrast a {
+  color: var(--text-primary) !important;
+  text-decoration: underline !important;
+}
+
+.high-contrast .bg-blue-50,
+.high-contrast .bg-green-50,
+.high-contrast .bg-red-50,
+.high-contrast .bg-yellow-50,
+.high-contrast .bg-purple-50 {
+  background-color: var(--bg-secondary) !important;
+}
+
+.high-contrast .text-blue-600,
+.high-contrast .text-green-600,
+.high-contrast .text-red-600,
+.high-contrast .text-yellow-600,
+.high-contrast .text-purple-600 {
+  color: var(--text-primary) !important;
+}
+
+/* Reducir movimiento */
+.reduce-motion *,
+.reduce-motion *:before,
+.reduce-motion *:after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  transition-delay: 0ms !important;
+}
+
+/* Mejoras de focus para accesibilidad */
+*:focus-visible {
+  outline: 3px solid #0066cc !important;
+  outline-offset: 2px !important;
+  box-shadow: none !important;
+}
+
+.high-contrast *:focus-visible {
+  outline: 3px solid var(--text-primary) !important;
+  outline-offset: 2px !important;
+}
+
+/* Skip links */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.sr-only:focus,
+.sr-only:active {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  padding: inherit !important;
+  margin: inherit !important;
+  overflow: visible !important;
+  clip: auto !important;
+  white-space: normal !important;
+}
+
+/* Estados de error más visibles */
+[aria-invalid="true"] {
+  border-color: var(--error-color) !important;
+  box-shadow: 0 0 0 1px var(--error-color) !important;
+}
+
+/* Mejora de contraste para elementos interactivos */
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+}
+
+.reduce-motion button:hover:not(:disabled) {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Indicadores de carga accesibles */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.reduce-motion .animate-spin {
+  animation: none !important;
+}
+
+/* Mejoras para lectores de pantalla */
+[aria-live] {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* Indicadores visuales para estados */
+.error-state {
+  border-left: 4px solid var(--error-color);
+  background-color: rgba(220, 38, 38, 0.05);
+}
+
+.success-state {
+  border-left: 4px solid var(--success-color);
+  background-color: rgba(22, 163, 74, 0.05);
+}
+
+/* Mejoras para navegación por teclado */
+[tabindex="-1"]:focus {
+  outline: none !important;
+}
+
+/* Asegurar que los elementos interactivos tengan un tamaño mínimo de 44px */
+button,
+[role="button"],
+input[type="checkbox"],
+input[type="radio"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Excepciones para iconos dentro de botones */
+button > svg,
+[role="button"] > svg {
+  min-height: auto;
+  min-width: auto;
+}
+
+/* Estilos específicos para el sidebar en alto contraste */
+.high-contrast aside {
+  background-color: var(--bg-secondary) !important;
+  border-right: 2px solid var(--border-color) !important;
+}
+
+/* Estilos para cards en alto contraste */
+.high-contrast .bg-white {
+  background-color: var(--bg-primary) !important;
+  border: 2px solid var(--border-color) !important;
+}
