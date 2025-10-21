@@ -3,6 +3,7 @@ import { Cliente, ClienteFormData } from "@/types/client";
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
 // DB -> UI
+// Convierte los campos de la base de datos al formato esperado en la UI
 function dbToUi(c: any): Cliente {
   return {
     CED_CLI: c.CED_CLI,
