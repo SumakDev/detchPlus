@@ -1,96 +1,66 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Layout from "@/components/Layout";
-import ClientForm from "@/components/ClientForm";
+import ClientUpsertDialog from "@/components/ClientUpsertDialog";
 import ClientTable from "@/components/ClientTable";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Cliente, ClienteFormData } from "@/types/client";
 import { Plus, Users, UserCheck, UserX } from "lucide-react";
+import { fetchClientes, createCliente, updateCliente, deleteCliente } from "@/lib/api/clients";
 
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [showForm, setShowForm] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [openUpsert, setOpenUpsert] = useState(false);
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
   const [viewingCliente, setViewingCliente] = useState<Cliente | null>(null);
 
-  // Datos de ejemplo - reemplazar con llamadas a API
+  async function loadClientes() {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchClientes();
+      setClientes(data);
+    } catch (err: any) {
+      setError(err?.message ?? "Error al cargar clientes");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    const clientesEjemplo: Cliente[] = [
-      {
-        CED_CLI: "1234567890",
-        NOM_CLI: "Juan",
-        APE_CLI: "Pérez",
-        DIR_CLI: "Av. Principal 123",
-        COR_CLI: "juan.perez@email.com",
-        NUM_CLI: "0999999999",
-        DIF_CLI: "MEDIA",
-        ACTIVO: true,
-        FECHA_REGISTRO: "2024-01-15T10:30:00Z"
-      },
-      {
-        CED_CLI: "0987654321",
-        NOM_CLI: "María",
-        APE_CLI: "González",
-        DIR_CLI: "Calle Secundaria 456",
-        COR_CLI: "maria.gonzalez@email.com",
-        NUM_CLI: "0988888888",
-        DIF_CLI: "BAJA",
-        ACTIVO: true,
-        FECHA_REGISTRO: "2024-02-20T14:15:00Z"
-      },
-      {
-        CED_CLI: "1122334455",
-        NOM_CLI: "Carlos",
-        APE_CLI: "Rodriguez",
-        DIR_CLI: "",
-        COR_CLI: "",
-        NUM_CLI: "0977777777",
-        DIF_CLI: "ALTA",
-        ACTIVO: false,
-        FECHA_REGISTRO: "2024-03-10T09:45:00Z"
-      }
-    ];
-    setClientes(clientesEjemplo);
+    loadClientes();
   }, []);
 
-  const handleCreateCliente = (data: ClienteFormData) => {
-    const nuevoCliente: Cliente = {
-      ...data,
-      FECHA_REGISTRO: new Date().toISOString()
-    };
-    
-    setClientes(prev => [...prev, nuevoCliente]);
-    setShowForm(false);
-    // Aquí harías la llamada a la API para crear el cliente
+  const stats = useMemo(
+    () => ({
+      total: clientes.length,
+      activos: clientes.filter((c) => c.ACTIVO).length,
+      inactivos: clientes.filter((c) => !c.ACTIVO).length,
+    }),
+    [clientes]
+  );
+
+  const handleCreateCliente = async (data: ClienteFormData) => {
+    const created = await createCliente(data);
+    setClientes((prev) => [created, ...prev]);
   };
 
-  const handleUpdateCliente = (data: ClienteFormData) => {
+  const handleUpdateCliente = async (data: ClienteFormData) => {
     if (!editingCliente) return;
-    
-    setClientes(prev => 
-      prev.map(cliente => 
-        cliente.CED_CLI === editingCliente.CED_CLI 
-          ? { ...cliente, ...data }
-          : cliente
-      )
-    );
+    const updated = await updateCliente(editingCliente.CED_CLI, data);
+    setClientes((prev) => prev.map((c) => (c.CED_CLI === updated.CED_CLI ? updated : c)));
     setEditingCliente(null);
-    // Aquí harías la llamada a la API para actualizar el cliente
   };
 
-  const handleDeleteCliente = (cedula: string) => {
-    if (confirm("¿Estás seguro de que deseas eliminar este cliente?")) {
-      setClientes(prev => prev.filter(cliente => cliente.CED_CLI !== cedula));
-      // Aquí harías la llamada a la API para eliminar el cliente
-    }
-  };
-
-  const stats = {
-    total: clientes.length,
-    activos: clientes.filter(c => c.ACTIVO).length,
-    inactivos: clientes.filter(c => !c.ACTIVO).length,
+  const handleDeleteCliente = async (cedula: string) => {
+    if (!confirm("¿Estás seguro de eliminar este cliente?")) return;
+    await deleteCliente(cedula);
+    setClientes((prev) => prev.filter((c) => c.CED_CLI !== cedula));
   };
 
   return (
@@ -102,8 +72,11 @@ export default function ClientesPage() {
             <h1 className="text-3xl font-bold text-gray-900">Gestión de Clientes</h1>
             <p className="text-gray-600">Administra la información de tus clientes</p>
           </div>
-          <Button 
-            onClick={() => setShowForm(true)}
+          <Button
+            onClick={() => {
+              setEditingCliente(null);
+              setOpenUpsert(true);
+            }}
             className="flex items-center gap-2"
           >
             <Plus className="h-4 w-4" />
@@ -111,7 +84,7 @@ export default function ClientesPage() {
           </Button>
         </div>
 
-        {/* Stats Cards */}
+        {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card>
             <CardContent className="p-6">
@@ -124,7 +97,6 @@ export default function ClientesPage() {
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -136,7 +108,6 @@ export default function ClientesPage() {
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -150,20 +121,26 @@ export default function ClientesPage() {
           </Card>
         </div>
 
-        {/* Formulario */}
-        {(showForm || editingCliente) && (
-          <ClientForm
-            cliente={editingCliente || undefined}
-            onSubmit={editingCliente ? handleUpdateCliente : handleCreateCliente}
-            onCancel={() => {
-              setShowForm(false);
-              setEditingCliente(null);
-            }}
-            isEditing={!!editingCliente}
-          />
+        {/* Estados */}
+        {loading && (
+          <Card>
+            <CardContent className="p-6">
+              <p className="text-gray-600">Cargando clientes...</p>
+            </CardContent>
+          </Card>
+        )}
+        {error && (
+          <Card>
+            <CardContent className="p-6">
+              <p className="text-red-600">Error: {error}</p>
+              <Button variant="outline" onClick={loadClientes} className="mt-3">
+                Reintentar
+              </Button>
+            </CardContent>
+          </Card>
         )}
 
-        {/* Vista detallada del cliente */}
+        {/* Detalle */}
         {viewingCliente && (
           <Card className="max-w-2xl mx-auto">
             <CardContent className="p-6">
@@ -173,7 +150,7 @@ export default function ClientesPage() {
                   Cerrar
                 </Button>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <strong>Cédula/RUC:</strong> {viewingCliente.CED_CLI}
@@ -197,22 +174,38 @@ export default function ClientesPage() {
                   <strong>Estado:</strong> {viewingCliente.ACTIVO ? "Activo" : "Inactivo"}
                 </div>
                 <div>
-                  <strong>Fecha de Registro:</strong> {new Date(viewingCliente.FECHA_REGISTRO).toLocaleDateString()}
+                  <strong>Fecha de Registro:</strong>{" "}
+                  {new Date(viewingCliente.FECHA_REGISTRO).toLocaleDateString()}
                 </div>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Tabla de clientes */}
-        {!showForm && !editingCliente && !viewingCliente && (
+        {/* Tabla */}
+        {!loading && !error && !viewingCliente && (
           <ClientTable
             clientes={clientes}
-            onEdit={setEditingCliente}
+            onEdit={(c) => {
+              setEditingCliente(c);
+              setOpenUpsert(true);
+            }}
             onDelete={handleDeleteCliente}
             onView={setViewingCliente}
           />
         )}
+
+        {/* Modal crear/editar */}
+        <ClientUpsertDialog
+          open={openUpsert}
+          onOpenChange={(o) => {
+            if (!o) setEditingCliente(null);
+            setOpenUpsert(o);
+          }}
+          isEditing={!!editingCliente}
+          cliente={editingCliente}
+          onSubmit={editingCliente ? handleUpdateCliente : handleCreateCliente}
+        />
       </div>
     </Layout>
   );
