@@ -1,4 +1,4 @@
-"use client";
+/*"use client";
 
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ export default function LoginModal({ open, setOpen }: LoginModalProps) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="sm:max-w-md bg-gradient-to-br from-gray-50 to-blue-50 rounded-2xl shadow-2xl border border-gray-200">
         <DialogHeader className="items-center">
-          {/* Logo DetchPlus */}
+          {/* Logo DetchPlus *//*}
           <div className="flex justify-center mb-2">
               <Apple className="h-6 w-6" />
               <span>  DetchPlus</span>
@@ -69,4 +69,4 @@ export default function LoginModal({ open, setOpen }: LoginModalProps) {
       </DialogContent>
     </Dialog>
   );
-}
+}*/

@@ -3,11 +3,13 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import LoginModal from "./login/page";
 import { Search, ShoppingBag, Apple, Star, Sparkles } from "lucide-react";
+import LoginModal from "@/components/auth/LoginModal";
+import RegisterModal from "@/components/auth/RegisterModal";
 
 export default function Home() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [cartCount] = useState(2);
 
   const products = [
@@ -412,8 +414,21 @@ export default function Home() {
         </div>
       </footer>
 
-      {/* Modal de Login */}
-      <LoginModal open={isLoginOpen} setOpen={setIsLoginOpen} />
+      <button onClick={() => setIsLoginOpen(true)} className="text-gray-600 hover:text-gray-900 font-medium">
+        Iniciar Sesión
+      </button>
+
+            {/* Modales */}
+      <LoginModal
+        open={isLoginOpen}
+        setOpen={setIsLoginOpen}
+        onOpenRegister={() => setIsRegisterOpen(true)}
+      />
+      <RegisterModal
+        open={isRegisterOpen}
+        setOpen={setIsRegisterOpen}
+        onOpenLogin={() => setIsLoginOpen(true)}
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import sequelize from "./config/database.js";
 import registerRoutes from "./routes/index.js";
 
+
 dotenv.config();
 
 const app = express();
@@ -14,6 +15,8 @@ const ORIGIN = process.env.CORS_ORIGIN || "http://localhost:3000";
 app.use(cors({ origin: ORIGIN, credentials: true }));
 app.use(express.json({ limit: "1mb" }));
 app.use(morgan("dev"));
+
+
 
 // Probar conexión a la DB (opcional en prod)
 try {

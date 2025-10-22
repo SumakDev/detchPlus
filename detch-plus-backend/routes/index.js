@@ -34,10 +34,12 @@ import ses_usuRouter from "./ses_usu.routes.js";
 import stockRouter from "./stock.routes.js";
 import tecnicosRouter from "./tecnicos.routes.js";
 import usuariosRouter from "./usuarios.routes.js";
+import authRouter from "./auth.routes.js";
 
 export default function registerRoutes(app) {
   app.use("/api/car_com", car_comRouter);
   app.use("/api/categorias", categoriasRouter);
+  app.use("/api/auth", authRouter);
   app.use("/api/clientes", clientesRouter);
   app.use("/api/cupones", cuponesRouter);
   app.use("/api/cup_uso", cup_usoRouter);
