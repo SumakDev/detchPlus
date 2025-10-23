@@ -37,6 +37,7 @@ export default function Layout({ children }: LayoutProps) {
     { name: "Ventas", href: "/ventas", icon: ShoppingCart },
     { name: "Clientes", href: "/clientes", icon: Users },
     { name: "Reportes", href: "/reportes", icon: FileText },
+    { name: "Productos", href: "/productos", icon: FileText },
   ];
 
   // Derivar estilos desde accesibilidad

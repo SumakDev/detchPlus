@@ -14,7 +14,8 @@ const PRODUCTOS = sequelize.define("PRODUCTOS", {
   FEC_ING_PRO: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
   ID_PRV: DataTypes.INTEGER,
   ACT_PRO: { type: DataTypes.BOOLEAN, defaultValue: true },
-  FEC_MOD_PRO: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+  FEC_MOD_PRO: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
+  IMG_URL: { type: DataTypes.STRING(255), allowNull: true },
 }, {
   tableName: "PRODUCTOS",
   timestamps: false,

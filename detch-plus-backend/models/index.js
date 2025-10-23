@@ -34,6 +34,14 @@ import RES_PRO from "./RES_PRO.js";
 import LOG_ACT_USU from "./LOG_ACT_USU.js";
 import NOTIF from "./NOTIF.js";
 
+MARCAS.hasMany(MODELOS, { foreignKey: "ID_MAR", as: "modelos" });
+MODELOS.belongsTo(MARCAS, { foreignKey: "ID_MAR", as: "marca" });
+
+// Producto -> catálogos
+PRODUCTOS.belongsTo(CATEGORIAS, { foreignKey: "ID_CAT", as: "categoria" });
+PRODUCTOS.belongsTo(MARCAS, { foreignKey: "ID_MAR", as: "marca" });
+PRODUCTOS.belongsTo(MODELOS, { foreignKey: "ID_MOD", as: "modelo" });
+
 export {
   CATEGORIAS,
   MARCAS,

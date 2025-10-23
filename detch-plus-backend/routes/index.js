@@ -35,10 +35,12 @@ import stockRouter from "./stock.routes.js";
 import tecnicosRouter from "./tecnicos.routes.js";
 import usuariosRouter from "./usuarios.routes.js";
 import authRouter from "./auth.routes.js";
+import catalogosRouter from "./catalogos.routers.js";
 
 export default function registerRoutes(app) {
   app.use("/api/car_com", car_comRouter);
   app.use("/api/categorias", categoriasRouter);
+  app.use("/api/catalogos", catalogosRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/clientes", clientesRouter);
   app.use("/api/cupones", cuponesRouter);
