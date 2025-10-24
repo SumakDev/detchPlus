@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import StockKpis from "@/components/stock/StockKpis";
 import StockTable from "@/components/stock/StockTable";
 import AdjustStockDialog from "@/components/stock/AdjustStockDialog";
-import { StockItem } from "@/types/stock";
-import { fetchStock, adjustStock, updateMinStock } from "@/lib/api/stock";
+import type { StockItem } from "@/types/stock";
+import { fetchStock, postAjusteDisponible, putMinMax } from "@/lib/api/stock";
 
 export default function StockPage() {
   const [items, setItems] = useState<StockItem[]>([]);
@@ -39,35 +39,43 @@ export default function StockPage() {
   }, []);
 
   const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
     return items.filter((r) => {
       const matchesQ =
-        !q ||
-        r.NOM_PRO.toLowerCase().includes(q.toLowerCase()) ||
-        (r.SKU || "").toLowerCase().includes(q.toLowerCase()) ||
-        r.ID_PRO.toString().includes(q);
-      const critico = r.STOCK <= r.MIN_STOCK && r.STOCK > 0;
-      const agotado = r.STOCK === 0;
-      const ok = r.STOCK > r.MIN_STOCK;
+        !term ||
+        r.producto?.nombre?.toLowerCase().includes(term) ||
+        (r.producto?.codigo || "").toLowerCase().includes(term) ||
+        r.id.toString().includes(term);
+
       const matchesEstado =
         estado === "todos" ||
-        (estado === "criticos" && critico) ||
-        (estado === "agotados" && agotado) ||
-        (estado === "ok" && ok);
+        (estado === "criticos" && r.estado === "CRITICO") ||
+        (estado === "agotados" && r.estado === "AGOTADO") ||
+        (estado === "ok" && r.estado === "OK");
+
       return matchesQ && matchesEstado;
     });
   }, [items, q, estado]);
 
   const kpis = useMemo(() => {
     const total = items.length;
-    const criticos = items.filter((r) => r.STOCK <= r.MIN_STOCK && r.STOCK > 0).length;
-    const agotados = items.filter((r) => r.STOCK === 0).length;
+    const criticos = items.filter((r) => r.estado === "CRITICO").length;
+    const agotados = items.filter((r) => r.estado === "AGOTADO").length;
     return { total, criticos, agotados };
   }, [items]);
 
   function exportCsv() {
     const csv = [
-      ["ID_PRO", "SKU", "Nombre", "Ubicación", "Stock", "Mínimo"],
-      ...filtered.map((r) => [r.ID_PRO, r.SKU || "", r.NOM_PRO, r.UBICACION || "", r.STOCK, r.MIN_STOCK]),
+      ["ID_PRO", "Código", "Nombre", "Ubicación", "Disponible", "Reservado", "Mínimo"],
+      ...filtered.map((r) => [
+        r.id,
+        r.producto?.codigo || "",
+        r.producto?.nombre || "",
+        r.ubicacion || "",
+        r.disponible,
+        r.reservado,
+        r.minimo,
+      ]),
     ]
       .map((row) => row.join(","))
       .join("\n");
@@ -96,7 +104,7 @@ export default function StockPage() {
         <div className="bg-white border rounded-lg p-3 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
           <div className="flex gap-3 items-center">
             <Input
-              placeholder="Buscar por nombre, SKU o ID"
+              placeholder="Buscar por nombre, código o ID"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               className="w-64"
@@ -136,12 +144,19 @@ export default function StockPage() {
               setOpenAdjust(true);
             }}
             onUpdateMin={async (row) => {
-              const val = prompt(`Nuevo mínimo para "${row.NOM_PRO}"`, String(row.MIN_STOCK));
+              const val = prompt(`Nuevo mínimo para "${row.producto?.nombre || row.id}"`, String(row.minimo));
               if (val == null) return;
               const num = Number(val);
-              if (Number.isNaN(num) || num < 0) return alert("Valor inválido");
-              const updated = await updateMinStock(row.ID_PRO, num);
-              setItems((prev) => prev.map((r) => (r.ID_PRO === row.ID_PRO ? updated : r)));
+              if (Number.isNaN(num) || num < 0) {
+                alert("Valor inválido");
+                return;
+              }
+              try {
+                await putMinMax(row.id, num);
+                await load();
+              } catch (e: any) {
+                alert(e?.message || "No se pudo actualizar el mínimo");
+              }
             }}
           />
         )}
@@ -150,11 +165,19 @@ export default function StockPage() {
         <AdjustStockDialog
           open={openAdjust}
           setOpen={setOpenAdjust}
-          producto={rowAdjust ? { nombre: rowAdjust.NOM_PRO, stock: rowAdjust.STOCK } : undefined}
-          onConfirm={async (delta: any, motivo: any) => {
+          producto={
+            rowAdjust
+              ? { nombre: rowAdjust.producto?.nombre || String(rowAdjust.id), stock: rowAdjust.disponible }
+              : undefined
+          }
+          onConfirm={async (delta: number, motivo?: string) => {
             if (!rowAdjust) return;
-            const updated = await adjustStock({ idPro: rowAdjust.ID_PRO, delta, motivo });
-            setItems((prev) => prev.map((r) => (r.ID_PRO === rowAdjust.ID_PRO ? updated : r)));
+            try {
+              await postAjusteDisponible(rowAdjust.id, delta, { motivo });
+              await load();
+            } catch (e: any) {
+              alert(e?.message || "No se pudo aplicar el ajuste");
+            }
           }}
         />
       </div>

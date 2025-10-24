@@ -59,7 +59,7 @@ export async function createProducto(form: FormData): Promise<Producto> {
 }
 
 export async function updateProducto(id: string, form: FormData): Promise<Producto> {
-  const res = await fetch(`${API}/productos/${encodeURIComponent(id)}`, {
+  const res = await fetch(`${API}/productos/${encodeURIComponent(String(id))}`, {
     method: "PUT",
     headers: { ...getAuthHeaders() },
     body: form,
@@ -69,7 +69,7 @@ export async function updateProducto(id: string, form: FormData): Promise<Produc
 }
 
 export async function deleteProducto(id: string): Promise<void> {
-  const res = await fetch(`${API}/productos/${encodeURIComponent(id)}`, {
+  const res = await fetch(`${API}/productos/${encodeURIComponent(String(id))}`, {
     method: "DELETE",
     headers: { ...getAuthHeaders() },
   });

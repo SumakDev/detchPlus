@@ -7,7 +7,12 @@ import { Input } from "@/components/ui/input";
 import ProductTable from "@/components/products/ProductTable";
 import ProductUpsertDialog from "@/components/products/ProductUpsertDialog";
 import type { Producto, ProductoFormData } from "@/types/product";
-import { fetchProductos, createProducto, updateProducto, deleteProducto } from "@/lib/api/products";
+import {
+  fetchProductos,
+  createProducto,
+  updateProducto,
+  deleteProducto,
+} from "@/lib/api/products";
 import { Plus } from "lucide-react";
 
 export default function ProductosPage() {
@@ -63,17 +68,17 @@ export default function ProductosPage() {
     return fd;
   }
 
-  async function handleCreate(data: ProductoFormData) {
-    const created = await createProducto(toFormData(data));
-    setItems((prev) => [created as Producto, ...prev]);
-  }
+ async function handleCreate(fd: FormData) {
+  const created = await createProducto(fd);
+  setItems((prev) => [created, ...prev]);
+}
 
-  async function handleUpdate(data: ProductoFormData) {
-    if (!editing) return;
-    const updated = await updateProducto(editing.ID_PRO, toFormData(data));
-    setItems((prev) => prev.map((x) => (x.ID_PRO === (updated as Producto).ID_PRO ? (updated as Producto) : x)));
-    setEditing(null);
-  }
+async function handleUpdate(fd: FormData) {
+  if (!editing) return;
+  const updated = await updateProducto(editing.ID_PRO, fd);
+  setItems((prev) => prev.map((x) => (x.ID_PRO === updated.ID_PRO ? updated : x)));
+  setEditing(null);
+}
 
   async function handleDelete(id: string) {
     if (!confirm("¿Eliminar este producto?")) return;
@@ -86,10 +91,19 @@ export default function ProductosPage() {
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Productos</h1>
-            <p className="text-gray-600">Gestiona productos, relaciones y sus imágenes</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+              Productos
+            </h1>
+            <p className="text-gray-600">
+              Gestiona productos, relaciones y sus imágenes
+            </p>
           </div>
-          <Button onClick={() => { setEditing(null); setOpenUpsert(true); }}>
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setOpenUpsert(true);
+            }}
+          >
             <Plus className="h-4 w-4 mr-2" /> Agregar
           </Button>
         </div>
@@ -101,23 +115,37 @@ export default function ProductosPage() {
             onChange={(e) => setQ(e.target.value)}
             className="max-w-sm"
           />
-          <Button variant="outline" onClick={load}>Aplicar</Button>
+          <Button variant="outline" onClick={load}>
+            Aplicar
+          </Button>
         </div>
 
-        {loading && <div className="rounded border bg-white p-4">Cargando…</div>}
-        {error && <div className="rounded border border-red-200 bg-red-50 text-red-700 p-3 text-sm">Error: {error}</div>}
+        {loading && (
+          <div className="rounded border bg-white p-4">Cargando…</div>
+        )}
+        {error && (
+          <div className="rounded border border-red-200 bg-red-50 text-red-700 p-3 text-sm">
+            Error: {error}
+          </div>
+        )}
 
         {!loading && !error && (
           <ProductTable
             productos={filtered}
-            onEdit={(p) => { setEditing(p); setOpenUpsert(true); }}
+            onEdit={(p) => {
+              setEditing(p);
+              setOpenUpsert(true);
+            }}
             onDelete={handleDelete}
           />
         )}
 
         <ProductUpsertDialog
           open={openUpsert}
-          onOpenChange={(o) => { if (!o) setEditing(null); setOpenUpsert(o); }}
+          onOpenChange={(o) => {
+            if (!o) setEditing(null);
+            setOpenUpsert(o);
+          }}
           producto={editing || undefined}
           isEditing={!!editing}
           onSubmit={editing ? handleUpdate : handleCreate}

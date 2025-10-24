@@ -1,7 +1,9 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { PRODUCTOS, CATEGORIAS, MARCAS, MODELOS } from "../models/index.js";
+import { Op } from "sequelize";
+import sequelize from "../config/database.js";
+import { PRODUCTOS, CATEGORIAS, MARCAS, MODELOS, STOCK } from "../models/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,7 +12,7 @@ const uploadsDir = path.resolve(__dirname, "..", "uploads");
 function deleteIfExists(filename) {
   if (!filename) return;
   const p = path.join(uploadsDir, filename);
-  fs.promises.stat(p).then(() => fs.promises.unlink(p)).catch(() => {});
+  fs.promises.stat(p).then(() => fs.promises.unlink(p)).catch(() => { });
 }
 
 function computeNombre(row) {
@@ -23,10 +25,7 @@ function computeNombre(row) {
 
 function toUi(row) {
   const plain = row.get ? row.get({ plain: true }) : row;
-  return {
-    ...plain,
-    NOMBRE: computeNombre(plain),
-  };
+  return { ...plain, NOMBRE: computeNombre(plain) };
 }
 
 export async function getAll(req, res) {
@@ -35,21 +34,36 @@ export async function getAll(req, res) {
     const where = {};
     if (activo === "true") where.ACT_PRO = true;
     if (activo === "false") where.ACT_PRO = false;
-    if (q) {
-      // búsqueda simple por código de barras o IMEI o descripción
-      // Para LIKE con múltiples columnas, usar Op.or
-      where[Symbol.for("or")] = undefined; // placeholder para indicar que podría usarse Op.or
-    }
+
+    // Filtros por texto
+    const like = q ? `%${q}%` : null;
+    const include = [
+      { model: CATEGORIAS, as: "categoria", attributes: ["ID_CAT", "NOM_CAT"], required: false },
+      { model: MARCAS, as: "marca", attributes: ["ID_MAR", "NOM_MAR"], required: false },
+      { model: MODELOS, as: "modelo", attributes: ["ID_MOD", "NOM_MOD", "ID_MAR"], required: false },
+    ];
 
     const rows = await PRODUCTOS.findAll({
-      where,
-      order: [["FEC_ING_PRO", "DESC"], ["ID_PRO", "DESC"]],
-      include: [
-        { model: CATEGORIAS, as: "categoria", attributes: ["ID_CAT", "NOM_CAT"] },
-        { model: MARCAS, as: "marca", attributes: ["ID_MAR", "NOM_MAR"] },
-        { model: MODELOS, as: "modelo", attributes: ["ID_MOD", "NOM_MOD", "ID_MAR"] },
+      where: like
+        ? {
+          ...where,
+          [Op.or]: [
+            { COD_BAR_PRO: { [Op.like]: like } },
+            { IME_PRO: { [Op.like]: like } },
+            { DES_PRO: { [Op.like]: like } },
+            // Campos de las relaciones incluidas
+            { "$marca.NOM_MAR$": { [Op.like]: like } },
+            { "$modelo.NOM_MOD$": { [Op.like]: like } },
+          ],
+        }
+        : where,
+      include,
+      order: [
+        ["FEC_ING_PRO", "DESC"],
+        ["ID_PRO", "DESC"],
       ],
     });
+
     return res.json(rows.map(toUi));
   } catch (error) {
     console.error("productos.getAll", error);
@@ -58,41 +72,57 @@ export async function getAll(req, res) {
 }
 
 export async function create(req, res) {
+  const t = await sequelize.transaction();
   try {
     const body = req.body || {};
     const file = req.file;
-
+    console.log("POST /productos -> file?", !!file, "body keys:", Object.keys(body));
     // Validaciones relacionales
     const [cat, mar, mod] = await Promise.all([
-      CATEGORIAS.findByPk(body.ID_CAT),
-      MARCAS.findByPk(body.ID_MAR),
-      body.ID_MOD ? MODELOS.findByPk(body.ID_MOD) : null,
+      CATEGORIAS.findByPk(body.ID_CAT, { transaction: t }),
+      MARCAS.findByPk(body.ID_MAR, { transaction: t }),
+      body.ID_MOD ? MODELOS.findByPk(body.ID_MOD, { transaction: t }) : null,
     ]);
-
     if (!cat) return res.status(400).json({ error: "Categoría inválida" });
     if (!mar) return res.status(400).json({ error: "Marca inválida" });
     if (body.ID_MOD) {
       if (!mod) return res.status(400).json({ error: "Modelo inválido" });
       if (Number(mod.ID_MAR) !== Number(body.ID_MAR)) {
-        return res.status(400).json({ error: "El modelo seleccionado no pertenece a la marca" });
+        return res.status(400).json({ error: "El modelo no pertenece a la marca seleccionada" });
       }
     }
 
-    const created = await PRODUCTOS.create({
-      COD_BAR_PRO: body.COD_BAR_PRO || null,
-      IME_PRO: body.IME_PRO || null,
-      ID_CAT: Number(body.ID_CAT),
-      ID_MAR: Number(body.ID_MAR),
-      ID_MOD: body.ID_MOD || null,
-      DES_PRO: body.DES_PRO || null,
-      ORG_PRO: body.ORG_PRO, // COMPRA_NUEVA | PARTE_PAGO | CONSIGNACION
-      EST_PRO: body.EST_PRO, // NUEVO | USADO_EXCELENTE | USADO_BUENO | USADO_REGULAR
-      FEC_ING_PRO: body.FEC_ING_PRO ? new Date(body.FEC_ING_PRO) : new Date(),
-      ID_PRV: body.ID_PRV ? Number(body.ID_PRV) : null,
-      ACT_PRO: body.ACT_PRO !== undefined ? (String(body.ACT_PRO) === "true" || body.ACT_PRO === true) : true,
-      FEC_MOD_PRO: new Date(),
-      IMG_URL: file ? file.filename : null,
-    });
+    const created = await PRODUCTOS.create(
+      {
+        COD_BAR_PRO: body.COD_BAR_PRO || null,
+        IME_PRO: body.IME_PRO || null,
+        ID_CAT: Number(body.ID_CAT),
+        ID_MAR: Number(body.ID_MAR),
+        ID_MOD: body.ID_MOD || null,
+        DES_PRO: body.DES_PRO || null,
+        ORG_PRO: body.ORG_PRO, // COMPRA_NUEVA | PARTE_PAGO | CONSIGNACION
+        EST_PRO: body.EST_PRO, // NUEVO | USADO_EXCELENTE | USADO_BUENO | USADO_REGULAR
+        FEC_ING_PRO: body.FEC_ING_PRO ? new Date(body.FEC_ING_PRO) : new Date(),
+        ID_PRV: body.ID_PRV ? Number(body.ID_PRV) : null,
+        ACT_PRO: body.ACT_PRO !== undefined ? (String(body.ACT_PRO) === "true" || body.ACT_PRO === true) : true,
+        FEC_MOD_PRO: new Date(),
+        IMG_URL: file ? file.filename : null,
+      },
+      { transaction: t }
+    );
+
+    // Asegurar fila de stock
+    await STOCK.create(
+      {
+        ID_PRO: created.ID_PRO,
+        CAN_DIS_STO: 0,
+        CAN_RES_STO: 0,
+        STO_MIN: 1,
+        STO_MAX: 100,
+        FEC_ACT_STO: new Date(),
+      },
+      { transaction: t }
+    );
 
     const withInclude = await PRODUCTOS.findByPk(created.ID_PRO, {
       include: [
@@ -100,10 +130,13 @@ export async function create(req, res) {
         { model: MARCAS, as: "marca", attributes: ["ID_MAR", "NOM_MAR"] },
         { model: MODELOS, as: "modelo", attributes: ["ID_MOD", "NOM_MOD", "ID_MAR"] },
       ],
+      transaction: t,
     });
 
+    await t.commit();
     return res.status(201).json(toUi(withInclude));
   } catch (error) {
+    await t.rollback();
     console.error("productos.create", error);
     if (error?.name === "SequelizeUniqueConstraintError") {
       return res.status(409).json({ error: "Código de barras duplicado" });
@@ -117,7 +150,7 @@ export async function update(req, res) {
     const { id } = req.params;
     const body = req.body || {};
     const file = req.file;
-
+    console.log("POST /productos -> file?", !!file, "body keys:", Object.keys(body));
     const row = await PRODUCTOS.findByPk(id);
     if (!row) return res.status(404).json({ error: "No encontrado" });
 
@@ -132,7 +165,7 @@ export async function update(req, res) {
       if (effMod) {
         const checkMod = mod || (await MODELOS.findByPk(effMod));
         if (checkMod && Number(checkMod.ID_MAR) !== effMar) {
-          return res.status(400).json({ error: "El modelo seleccionado no pertenece a la marca" });
+          return res.status(400).json({ error: "El modelo no pertenece a la marca" });
         }
       }
     }
@@ -182,6 +215,6 @@ export async function remove(req, res) {
     return res.json({ message: "Eliminado correctamente" });
   } catch (error) {
     console.error("productos.remove", error);
-    return res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error});
   }
 }

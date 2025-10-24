@@ -2,11 +2,13 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
 import { create, getAll, update, remove } from "../controllers/productos.controller.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uploadsDir = path.resolve(__dirname, "..", "uploads");
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadsDir),
@@ -25,8 +27,8 @@ const upload = multer({ storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024
 const router = Router();
 
 router.get("/", getAll);
-router.post("/", upload.single("image"), create);
-router.put("/:id", upload.single("image"), update);
+router.post("/", upload.single("image"), create); // IMPORTANTE: "image"
+router.put("/:id", upload.single("image"), update); // IMPORTANTE: "image"
 router.delete("/:id", remove);
 
 export default router;
