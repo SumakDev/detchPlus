@@ -12,10 +12,11 @@ import { loginApi } from "@/lib/api/auth";
 type LoginModalProps = {
   open: boolean;
   setOpen: (open: boolean) => void;
-  onOpenRegister?: () => void; // <- nuevo
+  onSuccess?: (data: { token?: string; user?: any }) => void;
+  onOpenRegister?: () => void;
 };
 
-export default function LoginModal({ open, setOpen, onOpenRegister }: LoginModalProps) {
+export default function LoginModal({ open, setOpen, onOpenRegister, onSuccess }: LoginModalProps) {
   const router = useRouter();
   const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
@@ -28,10 +29,23 @@ export default function LoginModal({ open, setOpen, onOpenRegister }: LoginModal
     setLoading(true);
     try {
       const { token, user } = await loginApi(usuario, password);
+      // Guarda sesión
       localStorage.setItem("auth_token", token);
       if (user) localStorage.setItem("auth_user", JSON.stringify(user));
+      // Notifica al padre (Home) para que useAuth recargue y esconda botones
+      onSuccess?.({ token, user });
       setOpen(false);
-      router.push("/dashboard");
+
+      // Redirección condicional:
+      // - Rol 4 (usuario web): quedarse en la misma página (no navegar)
+      // - Otros roles: ir al dashboard
+      const rol = user?.ID_ROL ?? user?.rol;
+      if (rol && Number(rol) !== 4) {
+        router.push("/dashboard");
+      } else {
+        // Fuerza refresco suave de la página para pintar el UserMenu si lo necesitas
+        router.refresh();
+      }
     } catch (err: any) {
       setErrorMsg(err?.message || "Error al iniciar sesión");
     } finally {

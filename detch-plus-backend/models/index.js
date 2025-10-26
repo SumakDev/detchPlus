@@ -53,6 +53,14 @@ STOCK.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });
 PRODUCTOS.hasMany(MOV_INV, { foreignKey: "ID_PRO", as: "movimientos" });
 MOV_INV.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });
 
+// Servicio técnico: relaciones
+TECNICOS.hasMany(SER_TEC, { foreignKey: "ID_TEC", as: "servicios" });
+SER_TEC.belongsTo(TECNICOS, { foreignKey: "ID_TEC", as: "tecnico" });
+
+// SER_TEC -> CLIENTES por CED_CLI (targetKey en CLIENTES.CED_CLI)
+CLIENTES.hasMany(SER_TEC, { foreignKey: "CED_CLI", sourceKey: "CED_CLI", as: "servicios" });
+SER_TEC.belongsTo(CLIENTES, { foreignKey: "CED_CLI", targetKey: "CED_CLI", as: "cliente" });
+
 export {
   CATEGORIAS,
   MARCAS,

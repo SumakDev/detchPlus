@@ -13,10 +13,11 @@ type Props = {
   open: boolean;
   setOpen: (open: boolean) => void;
   onOpenLogin?: () => void;
+  onSuccess?: (data: { token?: string; user?: any }) => void;
   autoLogin?: boolean;
 };
 
-export default function RegisterModal({ open, setOpen, onOpenLogin, autoLogin = true }: Props) {
+export default function RegisterModal({ open, setOpen, onOpenLogin, onSuccess, autoLogin = true }: Props) {
   const router = useRouter();
   const [usuario, setUsuario] = useState("");
   const [email, setEmail] = useState("");
@@ -36,19 +37,36 @@ export default function RegisterModal({ open, setOpen, onOpenLogin, autoLogin = 
     setLoading(true);
     try {
       const res = await registerApi({ usuario, email, password, nombres, apellidos, aceptaTerminos });
+
+      // Caso 1: backend retorna token tras registrar (rol web por defecto)
       if (res.token) {
         localStorage.setItem("auth_token", res.token);
         if (res.user) localStorage.setItem("auth_user", JSON.stringify(res.user));
+        onSuccess?.({ token: res.token, user: res.user });
         setOpen(false);
-        return router.push("/dashboard");
+        // Usuario web → quedarse en la misma página
+        router.refresh();
+        return;
       }
+
+      // Caso 2: si no retorna token, hacemos autoLogin (opcional)
       if (autoLogin) {
         const { token, user } = await loginApi(usuario, password);
         localStorage.setItem("auth_token", token);
         if (user) localStorage.setItem("auth_user", JSON.stringify(user));
+        onSuccess?.({ token, user });
         setOpen(false);
-        return router.push("/dashboard");
+
+        const rol = user?.ID_ROL ?? user?.rol;
+        if (rol && Number(rol) !== 4) {
+          router.push("/dashboard");
+        } else {
+          router.refresh();
+        }
+        return;
       }
+
+      // Si no hay token ni autologin, cerrar y abrir login
       setOpen(false);
       onOpenLogin?.();
     } catch (err: any) {

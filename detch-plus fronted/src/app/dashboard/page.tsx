@@ -21,10 +21,9 @@ import {
   type StockResumen,
   type ReportesResumen,
 } from "@/lib/api/dashboard";
+import { getMe } from "@/lib/api/auth/me";
 
 export default function DashboardPage() {
-  const router = useRouter();
-
   const [loading, setLoading] = useState(true);
   const [errorClientes, setErrorClientes] = useState<string | null>(null);
   const [errorVentas, setErrorVentas] = useState<string | null>(null);
@@ -37,24 +36,38 @@ export default function DashboardPage() {
   const [reportes, setReportes] = useState<ReportesResumen | null>(null);
 
   const [userName, setUserName] = useState<string>("");
+  const router = useRouter();
 
-  // Protección de ruta + saludo
+  // Protección de ruta + saludo: solo llama /auth/me si hay token
   useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
     if (!token) {
       router.replace("/");
       return;
     }
-    const userStr = localStorage.getItem("auth_user");
-    if (userStr) {
-      try {
-        const u = JSON.parse(userStr);
-        setUserName(u?.nombres || u?.usuario || "");
-      } catch {}
-    }
+    getMe()
+      .then(({ user }) => {
+        if (!user) {
+          router.replace("/");
+          return;
+        }
+        if (user.ID_ROL === 4) {
+          router.replace("/mi-cuenta");
+          return;
+        }
+        const name =
+          [user.NOM_USU, user.APE_USU].filter(Boolean).join(" ").trim() ||
+          (user as any).USUARIO || // por compatibilidad si me() retorna USUARIO
+          (user as any).USR_USU || // o USR_USU
+          (user as any).EMAIL ||
+          (user as any).COR_USU ||
+          "";
+        setUserName(name);
+      })
+      .catch(() => router.replace("/"));
   }, [router]);
 
-  // Cargar datos
+  // Cargar datos del dashboard
   useEffect(() => {
     let mounted = true;
     async function loadAll() {
@@ -124,6 +137,9 @@ export default function DashboardPage() {
           <p className="text-gray-600">Resumen general, ventas, stock y reportes</p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/perfil">
+            <Button variant="outline">Mi perfil</Button>
+          </Link>
           <Link href="/clientes">
             <Button className="bg-gray-900 hover:bg-gray-800">Ir a Clientes</Button>
           </Link>

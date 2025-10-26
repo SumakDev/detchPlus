@@ -17,6 +17,8 @@ import {
   ChevronDown,
   Apple,
   LogOut,
+  Package2,
+  UserCog,
 } from "lucide-react";
 
 interface LayoutProps {
@@ -37,7 +39,9 @@ export default function Layout({ children }: LayoutProps) {
     { name: "Ventas", href: "/ventas", icon: ShoppingCart },
     { name: "Clientes", href: "/clientes", icon: Users },
     { name: "Reportes", href: "/reportes", icon: FileText },
-    { name: "Productos", href: "/productos", icon: FileText },
+    { name: "Productos", href: "/productos", icon: Package2 },
+    { name: "Servicio Técnico", href: "/servicio-tecnico", icon: Settings },
+    { name: "Técnicos", href: "/tecnicos", icon: UserCog },
   ];
 
   // Derivar estilos desde accesibilidad

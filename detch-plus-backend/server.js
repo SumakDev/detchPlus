@@ -1,39 +1,32 @@
+import "dotenv/config";
 import express from "express";
-import cors from "cors";
-import morgan from "morgan";
-import dotenv from "dotenv";
-import sequelize from "./config/database.js";
-import registerRoutes from "./routes/index.js";
 import path from "path";
+import { fileURLToPath } from "url";
 
+import corsMiddleware from "./middleware/cors.js";
+import registerRoutes from "./routes/index.js";
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 4000;
-const ORIGIN = process.env.CORS_ORIGIN || "http://localhost:3000";
 
-app.use(cors({ origin: ORIGIN, credentials: true }));
-app.use(express.json({ limit: "1mb" }));
-app.use("/uploads", (await import("express")).default.static(path.resolve("uploads")));
-app.use(morgan("dev"));
+// Middlewares base
+app.use(corsMiddleware);
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
 
+// Servir archivos subidos
+app.use("/uploads", express.static(path.resolve(__dirname, "uploads")));
 
-
-// Probar conexión a la DB (opcional en prod)
-try {
-  await sequelize.authenticate();
-  console.log("✅ DB conectada");
-} catch (err) {
-  console.error("❌ Error conectando a DB:", err.message);
-}
-
-// Rutas API (asegúrate de tener routes/index.js exportando una función)
+// Rutas de la API (tu routes/index.js ya define /api/auth, /api/productos, etc.)
 registerRoutes(app);
 
-// Healthcheck
-app.get("/health", (req, res) => res.json({ ok: true }));
+// Salud
+app.get("/", (_req, res) => res.json({ ok: true, name: "detch-plus-backend" }));
 
+const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
-  console.log(`🚀 API escuchando en http://localhost:${PORT}`);
+  console.log(`API escuchando en http://localhost:${PORT}`);
+  console.log(`Uploads servidos en http://localhost:${PORT}/uploads`);
 });
