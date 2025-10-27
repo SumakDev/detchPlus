@@ -1,219 +1,226 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import Layout from "@/components/Layout";
-import ClientForm from "@/components/ClientForm";
-import ClientTable from "@/components/ClientTable";
-import StatsCards from "@/components/statsCards";
-import SearchBar from "@/components/SearchBar";
-import { Cliente, ClienteFormData } from "@/types/client";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import KpiCard from "@/components/dashboard/KpiCard";
+import RecentClients from "@/components/dashboard/RecentClients";
+import QuickActions from "@/components/dashboard/QuickActions";
+import SalesSummary from "@/components/dashboard/SalesSummary";
+import StockSummary from "@/components/dashboard/StockSummary";
+import ReportsPanel from "@/components/dashboard/ReportsPanel";
+import {
+  fetchClientesListado,
+  fetchVentasResumen,
+  fetchStockResumen,
+  fetchReportesResumen,
+  type ClienteUI,
+  type VentasResumen,
+  type StockResumen,
+  type ReportesResumen,
+} from "@/lib/api/dashboard";
+import { getMe } from "@/lib/api/auth/me";
 
-export default function ClientesPage() {
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
-  const [viewingCliente, setViewingCliente] = useState<Cliente | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filters, setFilters] = useState({ dificultad: "all", activo: "all" });
+export default function DashboardPage() {
+  const [loading, setLoading] = useState(true);
+  const [errorClientes, setErrorClientes] = useState<string | null>(null);
+  const [errorVentas, setErrorVentas] = useState<string | null>(null);
+  const [errorStock, setErrorStock] = useState<string | null>(null);
+  const [errorReportes, setErrorReportes] = useState<string | null>(null);
 
-  // Datos de ejemplo
+  const [clientes, setClientes] = useState<ClienteUI[]>([]);
+  const [ventas, setVentas] = useState<VentasResumen | null>(null);
+  const [stock, setStock] = useState<StockResumen | null>(null);
+  const [reportes, setReportes] = useState<ReportesResumen | null>(null);
+
+  const [userName, setUserName] = useState<string>("");
+  const router = useRouter();
+
+  // Protección de ruta + saludo: solo llama /auth/me si hay token
   useEffect(() => {
-    const clientesEjemplo: Cliente[] = [
-      {
-        CED_CLI: "1234567890",
-        NOM_CLI: "Juan",
-        APE_CLI: "Pérez",
-        DIR_CLI: "Av. Principal 123",
-        COR_CLI: "juan.perez@email.com",
-        NUM_CLI: "0999999999",
-        DIF_CLI: "MEDIA",
-        ACTIVO: true,
-        FECHA_REGISTRO: "2024-01-15T10:30:00Z"
-      },
-      {
-        CED_CLI: "0987654321",
-        NOM_CLI: "María",
-        APE_CLI: "González",
-        DIR_CLI: "Calle Secundaria 456",
-        COR_CLI: "maria.gonzalez@email.com",
-        NUM_CLI: "0988888888",
-        DIF_CLI: "BAJA",
-        ACTIVO: true,
-        FECHA_REGISTRO: "2024-02-20T14:15:00Z"
-      },
-      {
-        CED_CLI: "1122334455",
-        NOM_CLI: "Carlos",
-        APE_CLI: "Rodriguez",
-        DIR_CLI: "",
-        COR_CLI: "",
-        NUM_CLI: "0977777777",
-        DIF_CLI: "ALTA",
-        ACTIVO: false,
-        FECHA_REGISTRO: "2024-03-10T09:45:00Z"
+    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+    if (!token) {
+      router.replace("/");
+      return;
+    }
+    getMe()
+      .then(({ user }) => {
+        if (!user) {
+          router.replace("/");
+          return;
+        }
+        if (user.ID_ROL === 4) {
+          router.replace("/mi-cuenta");
+          return;
+        }
+        const name =
+          [user.NOM_USU, user.APE_USU].filter(Boolean).join(" ").trim() ||
+          (user as any).USUARIO || // por compatibilidad si me() retorna USUARIO
+          (user as any).USR_USU || // o USR_USU
+          (user as any).EMAIL ||
+          (user as any).COR_USU ||
+          "";
+        setUserName(name);
+      })
+      .catch(() => router.replace("/"));
+  }, [router]);
+
+  // Cargar datos del dashboard
+  useEffect(() => {
+    let mounted = true;
+    async function loadAll() {
+      setLoading(true);
+      setErrorClientes(null);
+      setErrorVentas(null);
+      setErrorStock(null);
+      setErrorReportes(null);
+      try {
+        const [c, v, s, r] = await Promise.allSettled([
+          fetchClientesListado(),
+          fetchVentasResumen(),
+          fetchStockResumen(),
+          fetchReportesResumen(),
+        ]);
+
+        if (mounted) {
+          if (c.status === "fulfilled") setClientes(c.value);
+          else setErrorClientes(c.reason?.message || "Error clientes");
+
+          if (v.status === "fulfilled") setVentas(v.value);
+          else setErrorVentas(v.reason?.message || "Error ventas");
+
+          if (s.status === "fulfilled") setStock(s.value);
+          else setErrorStock(s.reason?.message || "Error stock");
+
+          if (r.status === "fulfilled") setReportes(r.value);
+          else setErrorReportes(r.reason?.message || "Error reportes");
+        }
+      } finally {
+        if (mounted) setLoading(false);
       }
-    ];
-    setClientes(clientesEjemplo);
+    }
+    loadAll();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  // Resto de la lógica...
-  const filteredClientes = useMemo(() => {
-    return clientes.filter((cliente) => {
-      const matchesSearch = 
-        cliente.NOM_CLI.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cliente.APE_CLI.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cliente.CED_CLI.includes(searchTerm) ||
-        (cliente.COR_CLI && cliente.COR_CLI.toLowerCase().includes(searchTerm.toLowerCase()));
+  const statsClientes = useMemo(() => {
+    const total = clientes.length;
+    const activos = clientes.filter((c) => c.ACTIVO).length;
+    const inactivos = total - activos;
+    const hoy = new Date();
+    const nuevosEsteMes = clientes.filter((c) => {
+      const f = new Date(c.FECHA_REGISTRO);
+      return f.getMonth() === hoy.getMonth() && f.getFullYear() === hoy.getFullYear();
+    }).length;
+    const actividad = Math.min(100, Math.round((activos / Math.max(1, total)) * 100));
+    return { total, activos, inactivos, nuevosEsteMes, actividad };
+  }, [clientes]);
 
-      const matchesDificultad = filters.dificultad === "all" || cliente.DIF_CLI === filters.dificultad;
-      const matchesActivo = filters.activo === "all" || 
-        (filters.activo === "true" && cliente.ACTIVO) ||
-        (filters.activo === "false" && !cliente.ACTIVO);
-
-      return matchesSearch && matchesDificultad && matchesActivo;
-    });
-  }, [clientes, searchTerm, filters]);
-
-  const handleCreateCliente = (data: ClienteFormData) => {
-    const nuevoCliente: Cliente = {
-      ...data,
-      FECHA_REGISTRO: new Date().toISOString()
-    };
-    setClientes(prev => [...prev, nuevoCliente]);
-    setShowForm(false);
-  };
-
-  const handleUpdateCliente = (data: ClienteFormData) => {
-    if (!editingCliente) return;
-    setClientes(prev => 
-      prev.map(cliente => 
-        cliente.CED_CLI === editingCliente.CED_CLI 
-          ? { ...cliente, ...data }
-          : cliente
-      )
-    );
-    setEditingCliente(null);
-  };
-
-  const handleDeleteCliente = (cedula: string) => {
-    if (confirm("¿Estás seguro de que deseas eliminar este cliente?")) {
-      setClientes(prev => prev.filter(cliente => cliente.CED_CLI !== cedula));
-    }
-  };
-
-  const handleExport = () => {
-    const csv = [
-      ['Cédula', 'Nombre', 'Apellido', 'Correo', 'Teléfono', 'Estado', 'Dificultad'],
-      ...filteredClientes.map(cliente => [
-        cliente.CED_CLI,
-        cliente.NOM_CLI,
-        cliente.APE_CLI,
-        cliente.COR_CLI || '',
-        cliente.NUM_CLI || '',
-        cliente.ACTIVO ? 'Activo' : 'Inactivo',
-        cliente.DIF_CLI
-      ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'clientes.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
-
-  const stats = {
-    total: clientes.length,
-    activos: clientes.filter(c => c.ACTIVO).length,
-    inactivos: clientes.filter(c => !c.ACTIVO).length,
-    nuevosEsteMes: clientes.filter(c => {
-      const fecha = new Date(c.FECHA_REGISTRO);
-      const hoy = new Date();
-      return fecha.getMonth() === hoy.getMonth() && fecha.getFullYear() === hoy.getFullYear();
-    }).length,
-  };
+  function logout() {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
+    router.replace("/");
+  }
 
   return (
-    <Layout>
-      {/* Container sin padding extra */}
-      <div className="space-y-4 max-w-7xl mx-auto"> {/* Reducido de space-y-6 a space-y-4 */}
-        
-        {/* Header compacto */}
-        <div className="mb-4"> {/* Añadido mb-4 para control específico */}
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Gestión de Clientes</h1> {/* Reducido de text-3xl */}
-          <p className="text-gray-600 text-sm">Administra la información de tus clientes</p>
+    <main className="mx-auto max-w-7xl p-4 md:p-6 space-y-6">
+      {/* Encabezado */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+            {userName ? `Hola, ${userName} 👋` : "Dashboard"}
+          </h1>
+          <p className="text-gray-600">Resumen general, ventas, stock y reportes</p>
         </div>
-
-        {/* Estadísticas */}
-        <StatsCards 
-          totalClientes={stats.total}
-          clientesActivos={stats.activos}
-          clientesInactivos={stats.inactivos}
-          nuevosEsteMes={stats.nuevosEsteMes}
-        />
-
-        {/* Barra de búsqueda y filtros */}
-        <SearchBar
-          onSearch={setSearchTerm}
-          onFilterChange={setFilters}
-          onExport={handleExport}
-          onAddClient={() => setShowForm(true)}
-          totalResults={filteredClientes.length}
-        />
-
-        {/* Formulario */}
-        {(showForm || editingCliente) && (
-          <ClientForm
-            cliente={editingCliente || undefined}
-            onSubmit={editingCliente ? handleUpdateCliente : handleCreateCliente}
-            onCancel={() => {
-              setShowForm(false);
-              setEditingCliente(null);
-            }}
-            isEditing={!!editingCliente}
-          />
-        )}
-
-        {/* Vista detallada del cliente */}
-        {viewingCliente && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-xl font-semibold">Detalles del Cliente</h3>
-                <button 
-                  onClick={() => setViewingCliente(null)}
-                  className="text-gray-400 hover:text-gray-600 text-xl font-bold"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div><strong>Cédula/RUC:</strong> {viewingCliente.CED_CLI}</div>
-                <div><strong>Nombre:</strong> {viewingCliente.NOM_CLI} {viewingCliente.APE_CLI}</div>
-                <div><strong>Correo:</strong> {viewingCliente.COR_CLI || "No especificado"}</div>
-                <div><strong>Teléfono:</strong> {viewingCliente.NUM_CLI || "No especificado"}</div>
-                <div><strong>Dirección:</strong> {viewingCliente.DIR_CLI || "No especificada"}</div>
-                <div><strong>Dificultad:</strong> {viewingCliente.DIF_CLI}</div>
-                <div><strong>Estado:</strong> {viewingCliente.ACTIVO ? "Activo" : "Inactivo"}</div>
-                <div><strong>Fecha de Registro:</strong> {new Date(viewingCliente.FECHA_REGISTRO).toLocaleDateString()}</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tabla de clientes */}
-        {!showForm && !editingCliente && (
-          <ClientTable
-            clientes={filteredClientes}
-            onEdit={setEditingCliente}
-            onDelete={handleDeleteCliente}
-            onView={setViewingCliente}
-          />
-        )}
+        <div className="flex items-center gap-2">
+          <Link href="/perfil">
+            <Button variant="outline">Mi perfil</Button>
+          </Link>
+          <Link href="/clientes">
+            <Button className="bg-gray-900 hover:bg-gray-800">Ir a Clientes</Button>
+          </Link>
+          <Button variant="outline" onClick={logout}>
+            Cerrar sesión
+          </Button>
+        </div>
       </div>
-    </Layout>
+
+      {/* KPIs principales */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <KpiCard
+          title="Total Clientes"
+          value={loading ? "…" : String(statsClientes.total)}
+          trendLabel="Activos"
+          trendValue={loading ? "…" : `${statsClientes.activos}`}
+          color="blue"
+        />
+        <KpiCard
+          title="Ventas hoy"
+          value={loading ? "…" : (ventas ? ventas.totalHoyFmt : "—")}
+          trendLabel="Tickets"
+          trendValue={loading ? "…" : (ventas ? `${ventas.ticketsHoy}` : "—")}
+          color="green"
+        />
+        <KpiCard
+          title="Stock crítico"
+          value={loading ? "…" : (stock ? String(stock.criticos) : "—")}
+          trendLabel="Agotados"
+          trendValue={loading ? "…" : (stock ? String(stock.agotados) : "—")}
+          color="amber"
+        />
+        <KpiCard
+          title="Reportes generados"
+          value={loading ? "…" : (reportes ? String(reportes.generadosMes) : "—")}
+          trendLabel="Pendientes"
+          trendValue={loading ? "…" : (reportes ? String(reportes.pendientes) : "—")}
+          color="purple"
+        />
+      </div>
+
+      {/* Actividad reciente + Acciones rápidas */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card className="lg:col-span-2">
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Actividad reciente de clientes</h2>
+              <Link href="/clientes" className="text-sm text-blue-600 hover:underline">
+                Ver todos
+              </Link>
+            </div>
+            {errorClientes && (
+              <div className="rounded-md border border-red-200 bg-red-50 text-red-700 p-3 mb-4 text-sm">
+                Error: {errorClientes}
+              </div>
+            )}
+            <RecentClients
+              loading={loading}
+              items={[...clientes]
+                .sort((a, b) => new Date(b.FECHA_REGISTRO).getTime() - new Date(a.FECHA_REGISTRO).getTime())
+                .slice(0, 5)}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Acciones rápidas</h2>
+            <QuickActions />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Resúmenes: Ventas y Stock */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <SalesSummary data={ventas} error={errorVentas} loading={loading} />
+        <StockSummary data={stock} error={errorStock} loading={loading} />
+      </div>
+
+      {/* Reportes */}
+      <ReportsPanel data={reportes} error={errorReportes} loading={loading} />
+    </main>
   );
 }

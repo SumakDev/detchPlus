@@ -2,7 +2,6 @@ import { Cliente, ClienteFormData } from "@/types/client";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
-// DB -> UI
 function dbToUi(c: any): Cliente {
   return {
     CED_CLI: c.CED_CLI,
@@ -17,7 +16,6 @@ function dbToUi(c: any): Cliente {
   };
 }
 
-// UI -> DB
 function uiToDbPayload(data: Partial<ClienteFormData>) {
   return {
     CED_CLI: data.CED_CLI,
@@ -28,13 +26,33 @@ function uiToDbPayload(data: Partial<ClienteFormData>) {
     NUM_CLI: data.NUM_CLI ?? null,
     DIF_CLI: data.DIF_CLI ?? "BAJA",
     ACT_CLI: typeof data.ACTIVO === "boolean" ? data.ACTIVO : true,
+    // Si necesitas enviar FEC_REG_CLI explícito, añade:
+    // FEC_REG_CLI: new Date().toISOString(),
   };
+}
+
+async function handleJson(res: Response) {
+  const text = await res.text();
+  let json: any = null;
+  try { json = text ? JSON.parse(text) : null; } catch { /* respuesta no-JSON */ }
+  if (!res.ok) {
+    const message =
+      (json?.error && typeof json.error === "string" && json.error) ||
+      (json?.message && typeof json.message === "string" && json.message) ||
+      text ||
+      `HTTP ${res.status}`;
+    const details = json?.details;
+    const e = new Error(message) as Error & { details?: any; status?: number };
+    e.details = details;
+    e.status = res.status;
+    throw e;
+  }
+  return json;
 }
 
 export async function fetchClientes(): Promise<Cliente[]> {
   const res = await fetch(`${API}/clientes`, { cache: "no-store" });
-  if (!res.ok) throw new Error(await res.text());
-  const json = await res.json();
+  const json = await handleJson(res);
   const rows = Array.isArray(json) ? json : json.data ?? [];
   return rows.map(dbToUi);
 }
@@ -45,8 +63,8 @@ export async function createCliente(data: ClienteFormData): Promise<Cliente> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(uiToDbPayload(data)),
   });
-  if (!res.ok) throw new Error(await res.text());
-  return dbToUi(await res.json());
+  const json = await handleJson(res);
+  return dbToUi(json);
 }
 
 export async function updateCliente(cedula: string, data: ClienteFormData): Promise<Cliente> {
@@ -55,11 +73,11 @@ export async function updateCliente(cedula: string, data: ClienteFormData): Prom
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(uiToDbPayload(data)),
   });
-  if (!res.ok) throw new Error(await res.text());
-  return dbToUi(await res.json());
+  const json = await handleJson(res);
+  return dbToUi(json);
 }
 
 export async function deleteCliente(cedula: string): Promise<void> {
   const res = await fetch(`${API}/clientes/${encodeURIComponent(cedula)}`, { method: "DELETE" });
-  if (!res.ok) throw new Error(await res.text());
+  await handleJson(res);
 }

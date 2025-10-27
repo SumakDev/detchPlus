@@ -1,12 +1,32 @@
 import { Router } from "express";
-import * as stockController from "../controllers/stock.controller.js";
+import {
+  getAll,
+  resumen,
+  movimientos,
+  entrada,
+  salida,
+  reservar,
+  desreservar,
+  salidaDesdeReserva,
+  ajustarDisponible,
+  actualizarMinMax,
+  actualizarUbicacion,
+} from "../controllers/stock.controller.js";
 
 const router = Router();
 
-router.get("/", stockController.getAll);
-router.get("/:id", stockController.getOne);
-router.post("/", stockController.create);
-router.put("/:id", stockController.update);
-router.delete("/:id", stockController.remove);
+router.get("/", getAll);
+router.get("/resumen", resumen);
+router.get("/movimientos/:idPro?", movimientos);
+
+router.post("/entrada", entrada);
+router.post("/salida", salida);
+router.post("/reservar", reservar);
+router.post("/desreservar", desreservar);
+router.post("/salida-reserva", salidaDesdeReserva);
+router.post("/ajustar", ajustarDisponible);
+
+router.put("/minmax/:id", actualizarMinMax);
+router.put("/ubicacion/:id", actualizarUbicacion);
 
 export default router;
