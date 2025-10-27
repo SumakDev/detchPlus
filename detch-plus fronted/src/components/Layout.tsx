@@ -19,6 +19,8 @@ import {
   LogOut,
   Package2,
   UserCog,
+  Users2,
+  UserSquare,
 } from "lucide-react";
 
 interface LayoutProps {
@@ -42,7 +44,15 @@ export default function Layout({ children }: LayoutProps) {
     { name: "Productos", href: "/productos", icon: Package2 },
     { name: "Servicio Técnico", href: "/servicio-tecnico", icon: Settings },
     { name: "Técnicos", href: "/tecnicos", icon: UserCog },
+    { name: "Usuarios", href: "/usuarios", icon: UserSquare },
   ];
+
+  const navigationAdmin = [
+
+
+  ];
+
+
 
   // Derivar estilos desde accesibilidad
   const fontClass =

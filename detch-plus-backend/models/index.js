@@ -61,6 +61,10 @@ SER_TEC.belongsTo(TECNICOS, { foreignKey: "ID_TEC", as: "tecnico" });
 CLIENTES.hasMany(SER_TEC, { foreignKey: "CED_CLI", sourceKey: "CED_CLI", as: "servicios" });
 SER_TEC.belongsTo(CLIENTES, { foreignKey: "CED_CLI", targetKey: "CED_CLI", as: "cliente" });
 
+// Asociaciones ROLES <-> USUARIOS
+ROLES.hasMany(USUARIOS, { foreignKey: "ID_ROL", as: "usuarios" });
+USUARIOS.belongsTo(ROLES, { foreignKey: "ID_ROL", as: "rol" });
+
 export {
   CATEGORIAS,
   MARCAS,
