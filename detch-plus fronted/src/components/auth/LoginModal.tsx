@@ -12,7 +12,7 @@ import { loginApi } from "@/lib/api/auth";
 type LoginModalProps = {
   open: boolean;
   setOpen: (open: boolean) => void;
-  onSuccess?: (data: { token?: string; user?: any }) => void;
+  onSuccess?: (data: { token?: string; user?: any; session_id?: string }) => void;
   onOpenRegister?: () => void;
 };
 
@@ -28,22 +28,20 @@ export default function LoginModal({ open, setOpen, onOpenRegister, onSuccess }:
     setErrorMsg(null);
     setLoading(true);
     try {
-      const { token, user } = await loginApi(usuario, password);
+      const { token, user, session_id } = await loginApi(usuario, password);
       // Guarda sesión
       localStorage.setItem("auth_token", token);
+      if (session_id) localStorage.setItem("session_id", session_id);
       if (user) localStorage.setItem("auth_user", JSON.stringify(user));
       // Notifica al padre (Home) para que useAuth recargue y esconda botones
-      onSuccess?.({ token, user });
+      onSuccess?.({ token, user, session_id });
       setOpen(false);
 
-      // Redirección condicional:
-      // - Rol 4 (usuario web): quedarse en la misma página (no navegar)
-      // - Otros roles: ir al dashboard
+      // Redirección condicional
       const rol = user?.ID_ROL ?? user?.rol;
       if (rol && Number(rol) !== 4) {
         router.push("/dashboard");
       } else {
-        // Fuerza refresco suave de la página para pintar el UserMenu si lo necesitas
         router.refresh();
       }
     } catch (err: any) {
@@ -69,8 +67,8 @@ export default function LoginModal({ open, setOpen, onOpenRegister, onSuccess }:
 
         <form className="space-y-5" onSubmit={handleSubmit}>
           <div>
-            <Label htmlFor="usuario" className="font-semibold text-gray-700">Usuario</Label>
-            <Input id="usuario" type="text" placeholder="Tu usuario" className="mt-1" value={usuario} onChange={(e) => setUsuario(e.target.value)} required />
+            <Label htmlFor="usuario" className="font-semibold text-gray-700">Usuario o email</Label>
+            <Input id="usuario" type="text" placeholder="Tu usuario o email" className="mt-1" value={usuario} onChange={(e) => setUsuario(e.target.value)} required />
           </div>
 
           <div>

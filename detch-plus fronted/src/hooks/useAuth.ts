@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getMe, type MeUser } from "@/lib/api/auth/me";
+import { logoutApi } from "@/lib/api/auth";
 
 export function useAuth() {
   const [user, setUser] = useState<MeUser | null>(null);
@@ -25,14 +26,17 @@ export function useAuth() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function loginWithToken(token: string) {
+  async function loginWithToken(token: string, sessionId?: string) {
     localStorage.setItem("auth_token", token);
+    if (sessionId) localStorage.setItem("session_id", sessionId);
     await load();
   }
 
-  function logout() {
+  async function logout() {
+    try { await logoutApi(); } catch {}
     localStorage.removeItem("auth_token");
-    localStorage.removeItem("auth_user"); // importante para no dejar residuos
+    localStorage.removeItem("auth_user");
+    localStorage.removeItem("session_id");
     setUser(null);
   }
 

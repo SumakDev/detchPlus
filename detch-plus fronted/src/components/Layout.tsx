@@ -21,7 +21,13 @@ import {
   UserCog,
   Users2,
   UserSquare,
+  Truck,
+  UsersRound,
+  UserSearch,
+  DollarSign,
 } from "lucide-react";
+import { userAgent } from "next/server";
+import { getMe } from "@/lib/api/auth/me";
 
 interface LayoutProps {
   children: ReactNode;
@@ -45,12 +51,41 @@ export default function Layout({ children }: LayoutProps) {
     { name: "Servicio Técnico", href: "/servicio-tecnico", icon: Settings },
     { name: "Técnicos", href: "/tecnicos", icon: UserCog },
     { name: "Usuarios", href: "/usuarios", icon: UserSquare },
+    { name: "Proveedores", href: "/proveedores", icon: Truck },
+    { name: "Sesiones", href: "/sesiones", icon: UserSearch },
+    { name: "Precios", href: "/precios", icon: DollarSign },
   ];
 
   const navigationAdmin = [
 
 
   ];
+
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  
+  
+    // Solo admins (1,2)
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+  
+    if (!token) { 
+      setIsAuthenticated(false);   // marcar como no autenticado
+      router.replace("/");          // redirigir al home
+      return; 
+    }
+  
+    getMe()
+      .then(({ user }) => {
+        if (!user || ![1,2].includes(Number(user.ID_ROL))) {
+          setIsAuthenticated(false);  // no autenticado
+          router.replace("/");         // redirigir
+        }
+      })
+      .catch(() => {
+        setIsAuthenticated(false);    // no autenticado
+        router.replace("/");
+      });
+  }, [router]);
 
 
 
@@ -116,7 +151,7 @@ export default function Layout({ children }: LayoutProps) {
     localStorage.removeItem("auth_user");
     router.replace("/");
   }
-
+if (!isAuthenticated) return null; // o un spinner mientras redirige
   return (
     <div className={`min-h-screen ${theme.bg} flex ${fontClass}`}>
       {/* Sidebar */}

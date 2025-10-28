@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { fetchServTecOptions } from "@/lib/api/servicio-tecnico";
+import { Tecnico } from "@/types/tecnico";
 
 export default function ServiceTechForm({
   initial,
@@ -26,7 +27,19 @@ export default function ServiceTechForm({
     IVA_SER?: number;
     PRE_VEN_SER?: number;
     EST_SER?: "RECIBIDO" | "EN_PROCESO" | "TERMINADO" | "ENTREGADO";
-  }) => Promise<void> | void;
+  },
+  detalle?: {
+    IME_TEL_SER?: string ;
+    MAR_TEL_SER?: string ;
+    MOD_TEL_SER?: string ;
+    CAP_TEL_SER?: string ;
+    DES_REP_TEL_SER?: string ;
+    DIR_SER?: string ;
+    PROB_REP_SER?: string ;
+    SOL_APL_SER?: string ;
+  }
+
+) => Promise<void> | void;
   onCancel: () => void;
 }) {
   const [tecnicos, setTecnicos] = useState<Array<{ ID_TEC: number; NOM_TEC: string }>>([]);
@@ -138,6 +151,7 @@ export default function ServiceTechForm({
           <option value="TERMINADO">TERMINADO</option>
           <option value="ENTREGADO">ENTREGADO</option>
         </select>
+        
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
