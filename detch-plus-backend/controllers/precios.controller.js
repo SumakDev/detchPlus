@@ -1,10 +1,19 @@
 import { Op } from "sequelize";
-import { PRECIOS, PRODUCTOS } from "../models/index.js";
+import { PRECIOS, PRODUCTOS, MARCAS, MODELOS } from "../models/index.js";
 
 const TIPOS = ["COMPRA", "VENTA", "PARTE_PAGO"];
 
 function asPlain(row) {
   return row.get ? row.get({ plain: true }) : row;
+}
+
+function decorate(rows) {
+  return rows.map((r) => {
+    const p = asPlain(r);
+    const marca = p.producto?.marca?.NOM_MAR || "";
+    const modelo = p.producto?.modelo?.NOM_MOD || "";
+    return { ...p, productoNombre: [marca, modelo].filter(Boolean).join(" ").trim() || null };
+  });
 }
 
 // GET /api/precios?q=&id_pro=&tip=
@@ -16,30 +25,46 @@ export async function getAll(req, res) {
     if (id_pro && !Number.isNaN(Number(id_pro))) where.ID_PRO = Number(id_pro);
     if (tip && TIPOS.includes(tip)) where.TIP_PRE = tip;
 
+    // Para buscar por marca y modelo usamos path de include
+    const havingOr = [];
     if (q) {
       const like = `%${q}%`;
-      // Búsqueda por ID_PRE, ID_PRO, tipo o nombre del producto
       where[Op.or] = [
         { ID_PRE: { [Op.like]: like } },
         { ID_PRO: { [Op.like]: like } },
         { TIP_PRE: { [Op.like]: like } },
-        { "$producto.NOM_PRO$": { [Op.like]: like } }, // requiere include con alias
       ];
+      // Nota: estas claves usan path de include
+      havingOr.push(
+        { "$producto->marca.NOM_MAR$": { [Op.like]: like } },
+        { "$producto->modelo.NOM_MOD$": { [Op.like]: like } }
+      );
     }
 
     const rows = await PRECIOS.findAll({
       where,
       include: [
-        { model: PRODUCTOS, as: "producto", attributes: ["ID_PRO", "NOM_PRO"] },
+        {
+          model: PRODUCTOS,
+          as: "producto",
+          attributes: ["ID_PRO", "ID_MAR", "ID_MOD","IMG_URL"],
+          include: [
+            { model: MARCAS, as: "marca", attributes: ["NOM_MAR"] },
+            { model: MODELOS, as: "modelo", attributes: ["NOM_MOD"] },
+          ],
+        },
       ],
+      // Para que los filtros por include funcionen, usamos where en top-level si corresponde:
+      ...(havingOr.length ? { having: { [Op.or]: havingOr } } : {}),
       order: [
         ["ID_PRO", "ASC"],
         ["TIP_PRE", "ASC"],
         ["ID_PRE", "DESC"],
       ],
+      subQuery: false,
     });
 
-    return res.json(rows.map(asPlain));
+    return res.json(decorate(rows));
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
@@ -49,9 +74,19 @@ export async function getAll(req, res) {
 export async function getOne(req, res) {
   try {
     const data = await PRECIOS.findByPk(req.params.id, {
-      include: [{ model: PRODUCTOS, as: "producto", attributes: ["ID_PRO", "NOM_PRO"] }],
+      include: [
+        {
+          model: PRODUCTOS,
+          as: "producto",
+          attributes: ["ID_PRO", "ID_MAR", "ID_MOD","IMG_URL"],
+          include: [
+            { model: MARCAS, as: "marca", attributes: ["NOM_MAR"] },
+            { model: MODELOS, as: "modelo", attributes: ["NOM_MOD"] },
+          ],
+        },
+      ],
     });
-    return data ? res.json(asPlain(data)) : res.status(404).json({ error: "No encontrado" });
+    return data ? res.json(decorate([data])[0]) : res.status(404).json({ error: "No encontrado" });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
@@ -67,13 +102,23 @@ export async function getByProducto(req, res) {
 
     const rows = await PRECIOS.findAll({
       where,
-      include: [{ model: PRODUCTOS, as: "producto", attributes: ["ID_PRO", "NOM_PRO"] }],
+      include: [
+        {
+          model: PRODUCTOS,
+          as: "producto",
+          attributes: ["ID_PRO", "ID_MAR", "ID_MOD","IMG_URL"],
+          include: [
+            { model: MARCAS, as: "marca", attributes: ["NOM_MAR"] },
+            { model: MODELOS, as: "modelo", attributes: ["NOM_MOD"] },
+          ],
+        },
+      ],
       order: [
         ["TIP_PRE", "ASC"],
         ["ID_PRE", "DESC"],
       ],
     });
-    return res.json(rows.map(asPlain));
+    return res.json(decorate(rows));
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
@@ -102,7 +147,7 @@ export async function create(req, res) {
 
     const created = await PRECIOS.create({ ID_PRO: Number(ID_PRO), TIP_PRE, VAL_PRE: val });
     const withProd = await PRECIOS.findByPk(created.ID_PRE, {
-      include: [{ model: PRODUCTOS, as: "producto", attributes: ["ID_PRO", "NOM_PRO"] }],
+      include: [{ model: PRODUCTOS, as: "producto", attributes: ["ID_PRO"] }],
     });
     return res.status(201).json(asPlain(withProd));
   } catch (error) {
@@ -143,7 +188,7 @@ export async function update(req, res) {
     });
 
     const withProd = await PRECIOS.findByPk(row.ID_PRE, {
-      include: [{ model: PRODUCTOS, as: "producto", attributes: ["ID_PRO", "NOM_PRO"] }],
+      include: [{ model: PRODUCTOS, as: "producto", attributes: ["ID_PRO"] }],
     });
 
     return res.json(asPlain(withProd));
@@ -172,7 +217,7 @@ export async function upsertPorTipo(req, res) {
     else await row.update({ VAL_PRE: val });
 
     const withProd = await PRECIOS.findByPk(row.ID_PRE, {
-      include: [{ model: PRODUCTOS, as: "producto", attributes: ["ID_PRO", "NOM_PRO"] }],
+      include: [{ model: PRODUCTOS, as: "producto", attributes: ["ID_PRO"] }],
     });
 
     return res.json(asPlain(withProd));

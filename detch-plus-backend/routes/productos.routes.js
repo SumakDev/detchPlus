@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import { create, getAll, update, remove } from "../controllers/productos.controller.js";
+import { getOne, upsertByProducto } from "../controllers/det_tele.controller.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,5 +31,10 @@ router.get("/", getAll);
 router.post("/", upload.single("image"), create); // IMPORTANTE: "image"
 router.put("/:id", upload.single("image"), update); // IMPORTANTE: "image"
 router.delete("/:id", remove);
+
+router.get("/:id/telefono", getOne);
+
+// PUT /api/productos/:id/telefono -> upsert del detalle de teléfono del producto
+router.put("/:id/telefono", upsertByProducto);
 
 export default router;

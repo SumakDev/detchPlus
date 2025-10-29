@@ -1,7 +1,16 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import type { Precio } from "@/lib/api/precios";
+import Image from "next/image";
+import type { Precio } from "@/types/precio";
+
+function nombreProducto(p: Precio) {
+  if (p.productoNombre) return p.productoNombre;
+  const marca = p.producto?.marca?.NOM_MAR || "";
+  const modelo = p.producto?.modelo?.NOM_MOD || "";
+  const name = [marca, modelo].filter(Boolean).join(" ").trim();
+  return name || "-";
+}
 
 export default function PreciosTable({
   items,
@@ -29,8 +38,26 @@ export default function PreciosTable({
             <tr><td colSpan={6} className="p-4 text-center text-gray-500">No hay precios</td></tr>
           )}
           {items.map((p) => (
-            <tr key={p.ID_PRE} className="border-t">
-              <td className="p-3 font-medium text-gray-900">{p.producto?.NOM_PRO || "-"}</td>
+            <tr key={p.ID_PRE} className="border-t"> 
+              <td className="p-3">
+                <div className="flex items-center gap-3">
+                  {p.producto?.IMG_URL ? (
+                    <Image
+                      src={p.producto.IMG_URL}
+                      alt={nombreProducto(p)}
+                      width={40}
+                      height={40}
+                      className="h-10 w-10 rounded object-cover border"
+                    />
+                  ) : (
+                    <div className="h-10 w-10 rounded bg-gray-100 border" />
+                  )}
+                  <div className="flex flex-col">
+                    <span className="font-medium text-gray-900">{nombreProducto(p)}</span>
+                    <span className="text-xs text-gray-500">#{p.ID_PRO}</span>
+                  </div>
+                </div>
+              </td>
               <td className="p-3">{p.ID_PRO}</td>
               <td className="p-3">{p.TIP_PRE}</td>
               <td className="p-3 font-semibold">${Number(p.VAL_PRE).toFixed(2)}</td>

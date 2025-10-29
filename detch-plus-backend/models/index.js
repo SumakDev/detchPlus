@@ -76,6 +76,10 @@ SES_USU.belongsTo(USUARIOS, { foreignKey: "ID_USU", as: "usuario" });
 PRODUCTOS.hasMany(PRECIOS, { foreignKey: "ID_PRO", as: "precios" });
 PRECIOS.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });
 
+// Relación 1:1 Producto ↔ Teléfono
+PRODUCTOS.hasOne(DET_TELE, { foreignKey: "ID_PRO", as: "telefono", onDelete: "CASCADE" });
+DET_TELE.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });
+
 export {
   CATEGORIAS,
   MARCAS,

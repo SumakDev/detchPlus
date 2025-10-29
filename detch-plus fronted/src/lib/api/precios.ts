@@ -1,9 +1,22 @@
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
+import type { Precio } from "@/types/precio";
+
 function getAuthHeaders(): Record<string, string> {
   if (typeof window === "undefined") return {};
   const token = localStorage.getItem("auth_token");
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function filesBaseUrl() {
+  if (!API) return "";
+  return API.replace(/\/api\/?$/, "") + "/uploads";
+}
+
+function absolutizeImage(url?: string | null) {
+  if (!url) return url;
+  if (/^https?:\/\//i.test(url)) return url;
+  return `${filesBaseUrl()}/${url}`;
 }
 
 async function handleJson(res: Response) {
@@ -19,14 +32,15 @@ async function handleJson(res: Response) {
   return json;
 }
 
-export type Precio = {
-  ID_PRE: number;
-  ID_PRO: number;
-  TIP_PRE: "COMPRA" | "VENTA" | "PARTE_PAGO";
-  VAL_PRE: number;
-  producto?: { ID_PRO: number; NOM_PRO?: string };
-};
 
+function mapPrecioImage(p: Precio): Precio {
+  if (p?.producto) {
+    p.producto = { ...p.producto, IMG_URL: absolutizeImage(p.producto.IMG_URL) };
+  }
+  return p;
+}
+
+// listados
 export async function fetchPrecios(params?: { q?: string; id_pro?: number; tip?: Precio["TIP_PRE"] }) {
   const qs = new URLSearchParams();
   if (params?.q) qs.set("q", params.q);
@@ -35,13 +49,15 @@ export async function fetchPrecios(params?: { q?: string; id_pro?: number; tip?:
   const res = await fetch(`${API}/precios${qs.toString() ? `?${qs.toString()}` : ""}`, {
     headers: { ...getAuthHeaders() }, cache: "no-store",
   });
-  return handleJson(res) as Promise<Precio[]>;
+  const data = (await handleJson(res)) as Precio[];
+  return data.map(mapPrecioImage);
 }
 
 export async function fetchPreciosPorProducto(id: number, tip?: Precio["TIP_PRE"]) {
   const url = `${API}/precios/producto/${id}${tip ? `?tip=${encodeURIComponent(tip)}` : ""}`;
   const res = await fetch(url, { headers: { ...getAuthHeaders() }, cache: "no-store" });
-  return handleJson(res) as Promise<Precio[]>;
+  const data = (await handleJson(res)) as Precio[];
+  return data.map(mapPrecioImage);
 }
 
 export async function createPrecio(body: Omit<Precio, "ID_PRE">) {
@@ -49,7 +65,8 @@ export async function createPrecio(body: Omit<Precio, "ID_PRE">) {
     method: "POST", headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify(body),
   });
-  return handleJson(res) as Promise<Precio>;
+  const data = (await handleJson(res)) as Precio;
+  return mapPrecioImage(data);
 }
 
 export async function updatePrecio(id: number, patch: Partial<Omit<Precio, "ID_PRE">>) {
@@ -57,7 +74,8 @@ export async function updatePrecio(id: number, patch: Partial<Omit<Precio, "ID_P
     method: "PUT", headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify(patch),
   });
-  return handleJson(res) as Promise<Precio>;
+  const data = (await handleJson(res)) as Precio;
+  return mapPrecioImage(data);
 }
 
 export async function upsertPrecioPorTipo(id_pro: number, tipo: Precio["TIP_PRE"], VAL_PRE: number) {
@@ -65,7 +83,8 @@ export async function upsertPrecioPorTipo(id_pro: number, tipo: Precio["TIP_PRE"
     method: "PUT", headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify({ VAL_PRE }),
   });
-  return handleJson(res) as Promise<Precio>;
+  const data = (await handleJson(res)) as Precio;
+  return mapPrecioImage(data);
 }
 
 export async function deletePrecio(id: number) {

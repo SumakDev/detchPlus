@@ -25,6 +25,7 @@ import {
   UsersRound,
   UserSearch,
   DollarSign,
+  Phone,
 } from "lucide-react";
 import { userAgent } from "next/server";
 import { getMe } from "@/lib/api/auth/me";
@@ -54,6 +55,7 @@ export default function Layout({ children }: LayoutProps) {
     { name: "Proveedores", href: "/proveedores", icon: Truck },
     { name: "Sesiones", href: "/sesiones", icon: UserSearch },
     { name: "Precios", href: "/precios", icon: DollarSign },
+    { name: "Teléfonos", href: "/telefonos", icon: Phone },
   ];
 
   const navigationAdmin = [

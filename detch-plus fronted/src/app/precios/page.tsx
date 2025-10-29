@@ -18,10 +18,10 @@ import {
   createPrecio,
   updatePrecio,
   deletePrecio,
-  upsertPrecioPorTipo,
-  type Precio,
+  upsertPrecioPorTipo
 } from "@/lib/api/precios";
 import { getMe } from "@/lib/api/auth/me";
+import  type {Precio} from "@/types/precio";
 
 export default function PreciosPage() {
   const router = useRouter();
@@ -37,16 +37,9 @@ export default function PreciosPage() {
   const [openEdit, setOpenEdit] = useState(false);
   const [editRow, setEditRow] = useState<Precio | null>(null);
 
-  // ✅ Verificación de sesión al cargar la página
   useEffect(() => {
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
-
-    if (!token) {
-      router.replace("/");
-      return;
-    }
-
+    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+    if (!token) { router.replace("/"); return; }
     getMe()
       .then(({ user }) => {
         if (!user) router.replace("/");
@@ -55,7 +48,6 @@ export default function PreciosPage() {
       .catch(() => router.replace("/"));
   }, [router]);
 
-  // ✅ Carga de precios desde la API
   async function load() {
     try {
       setLoading(true);
@@ -73,22 +65,24 @@ export default function PreciosPage() {
     }
   }
 
-  // ✅ Cargar precios al iniciar
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
-  // ✅ Filtro local
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return items.filter((p) => {
-      const prodName = (p.producto?.NOM_PRO || "").toLowerCase();
+      const marca = (p.producto?.marca?.NOM_MAR || "").toLowerCase();
+      const modelo = (p.producto?.modelo?.NOM_MOD || "").toLowerCase();
+      const prodName = (p.productoNombre || `${marca} ${modelo}`.trim()).toLowerCase();
+
       const matchesQ =
         !term ||
         String(p.ID_PRE).includes(term) ||
         String(p.ID_PRO).includes(term) ||
         p.TIP_PRE.toLowerCase().includes(term) ||
-        prodName.includes(term);
+        prodName.includes(term) ||
+        marca.includes(term) ||
+        modelo.includes(term);
+
       const matchesId = !idPro || String(p.ID_PRO) === idPro;
       const matchesTip = !tip || p.TIP_PRE === tip;
       return matchesQ && matchesId && matchesTip;
@@ -175,7 +169,7 @@ export default function PreciosPage() {
 
         {/* Crear */}
         <Dialog open={openNew} onOpenChange={setOpenNew}>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>Nuevo precio</DialogTitle>
             </DialogHeader>

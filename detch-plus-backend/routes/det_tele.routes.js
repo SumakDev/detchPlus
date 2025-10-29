@@ -1,12 +1,27 @@
 import { Router } from "express";
-import * as det_teleController from "../controllers/det_tele.controller.js";
+import { requireAuth, denyWebUser } from "../middleware/auth.js";
+import {
+  getAll,
+  getOne,
+  create,
+  update,
+  remove,
+  upsertByProducto,
+} from "../controllers/det_tele.controller.js";
 
 const router = Router();
 
-router.get("/", det_teleController.getAll);
-router.get("/:id", det_teleController.getOne);
-router.post("/", det_teleController.create);
-router.put("/:id", det_teleController.update);
-router.delete("/:id", det_teleController.remove);
+// Protegido para panel (bloquea rol web)
+router.use(requireAuth(), denyWebUser());
+
+// CRUD tradicional
+router.get("/", getAll);
+router.get("/:id", getOne);
+router.post("/", create);
+router.put("/:id", update);
+router.delete("/:id", remove);
+
+// Upsert por producto (ruta directa dentro del módulo)
+router.put("/producto/:id", upsertByProducto);
 
 export default router;
