@@ -138,6 +138,9 @@ export default function DashboardPage() {
           <p className="text-gray-600">Resumen general, ventas, stock y reportes</p>
         </div>
         <div className="flex items-center gap-2">
+                  <Link href="/">
+            <Button variant="outline">inicio</Button>
+          </Link>
           <Link href="/perfil">
             <Button variant="outline">Mi perfil</Button>
           </Link>

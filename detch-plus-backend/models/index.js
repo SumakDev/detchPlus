@@ -49,6 +49,10 @@ MODELOS.belongsTo(MARCAS, { foreignKey: "ID_MAR", as: "marca" });
 PRODUCTOS.hasOne(STOCK, { foreignKey: "ID_PRO", as: "stock", onDelete: "CASCADE" });
 STOCK.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });
 
+// Producto -> Proveedor (N:1)
+PROVEEDORES.hasMany(PRODUCTOS, { foreignKey: "ID_PRV", as: "productos" });
+PRODUCTOS.belongsTo(PROVEEDORES, { foreignKey: "ID_PRV", as: "proveedor" });
+
 // Movimientos -> Producto (1:N)
 PRODUCTOS.hasMany(MOV_INV, { foreignKey: "ID_PRO", as: "movimientos" });
 MOV_INV.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });
@@ -79,6 +83,10 @@ PRECIOS.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });
 // Relación 1:1 Producto ↔ Teléfono
 PRODUCTOS.hasOne(DET_TELE, { foreignKey: "ID_PRO", as: "telefono", onDelete: "CASCADE" });
 DET_TELE.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });
+
+// Asociación USUARIOS <-> EMPLEADOS / CLIENTES
+USUARIOS.belongsTo(EMPLEADOS, {foreignKey: "ID_PERSONA",constraints: false, as: "empleado"});
+USUARIOS.belongsTo(CLIENTES, {foreignKey: "ID_PERSONA",constraints: false, as: "cliente"});
 
 export {
   CATEGORIAS,

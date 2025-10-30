@@ -2,15 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import UsersTable from "@/components/usuarios/UsersTable";
-import UserRoleDialog from "@/components/usuarios/UsersRoleDialog";
-import UserStatusDialog from "@/components/usuarios/UsersStatusDialog";
-import { fetchUsuarios, updateUsuarioRol, updateUsuarioEstado} from "@/lib/api/usuarios";
+import UserEditDialog from "@/components/usuarios/UserEditDialog";
+import { fetchUsuarios } from "@/lib/api/usuarios";
 import type { Usuario } from "@/types/usuario";
 import { getMe } from "@/lib/api/auth/me";
-import Layout from "@/components/Layout";
 
 export default function UsuariosPage() {
   const router = useRouter();
@@ -22,10 +21,9 @@ export default function UsuariosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [roleOpen, setRoleOpen] = useState(false);
-  const [selUser, setSelUser] = useState<Usuario | null>(null);
-  const [statusOpen, setStatusOpen] = useState(false);
-
+  // Editor unificado
+  const [editOpen, setEditOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<Usuario | null>(null);
 
   // Protege solo admins (1,2)
   useEffect(() => {
@@ -50,7 +48,7 @@ export default function UsuariosPage() {
         q,
         rol: rol ? Number(rol) : undefined,
         est: est || undefined,
-      });
+      } as any);
       setItems(data);
     } catch (e: any) {
       setError(e?.message || "Error al cargar usuarios");
@@ -80,87 +78,78 @@ export default function UsuariosPage() {
 
   return (
     <Layout>
-    <main className="mx-auto max-w-7xl p-4 md:p-6 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Usuarios</h1>
-          <p className="text-gray-600">Gestión de roles y estados</p>
+      <main className="mx-auto max-w-7xl p-4 md:p-6 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Usuarios</h1>
+            <p className="text-gray-600">Gestión de rol, estado y vínculo (cliente/empleado)</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={load}>
+              Refrescar
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={load}>
-            Refrescar
-          </Button>
-        </div>
-      </div>
 
-      <div className="bg-white border rounded-lg p-3 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-        <div className="flex gap-3 items-center">
-          <Input
-            placeholder="Buscar por usuario, nombre o email"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            className="w-64"
+        <div className="bg-white border rounded-lg p-3 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+          <div className="flex gap-3 items-center">
+            <Input
+              placeholder="Buscar por usuario, nombre o email"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="w-64"
+            />
+            <select className="border rounded px-2 py-2 text-sm" value={rol} onChange={(e) => setRol(e.target.value)}>
+              <option value="">Rol (todos)</option>
+              <option value="1">SUPERADMIN</option>
+              <option value="2">ADMIN</option>
+              <option value="3">OPERADOR</option>
+              <option value="4">USUARIO WEB</option>
+              <option value="5">INVITADO</option>
+            </select>
+            <select className="border rounded px-2 py-2 text-sm" value={est} onChange={(e) => setEst(e.target.value)}>
+              <option value="">Estado (todos)</option>
+              <option value="ACTIVO">ACTIVO</option>
+              <option value="INACTIVO">INACTIVO</option>
+              <option value="BLOQUEADO">BLOQUEADO</option>
+              <option value="PEND_VER">PEND_VER</option>
+            </select>
+            <Button variant="outline" onClick={load}>
+              Aplicar
+            </Button>
+          </div>
+        </div>
+
+        {loading && <div className="rounded-md border p-4 bg-white">Cargando…</div>}
+        {error && (
+          <div className="rounded-md border border-red-200 bg-red-50 text-red-700 p-3 text-sm">
+            Error: {error}
+          </div>
+        )}
+
+        {!loading && !error && (
+          <UsersTable
+            items={filtered}
+            onEditUser={(u) => {
+              setSelectedUser(u);
+              setEditOpen(true);
+            }   }
           />
-          <select className="border rounded px-2 py-2 text-sm" value={rol} onChange={(e) => setRol(e.target.value)}>
-            <option value="">Rol (todos)</option>
-            <option value="1">SUPERADMIN (#1)</option>
-            <option value="2">ADMIN (#2)</option>
-            <option value="3">OPERADOR (#3)</option>
-            <option value="4">USUARIO_WEB (#4)</option>
-            <option value="5">INVITADO (#5)</option>
-          </select>
-          <select className="border rounded px-2 py-2 text-sm" value={est} onChange={(e) => setEst(e.target.value)}>
-            <option value="">Estado (todos)</option>
-            <option value="ACTIVO">ACTIVO</option>
-            <option value="INACTIVO">INACTIVO</option>
-            <option value="BLOQUEADO">BLOQUEADO</option>
-            <option value="PEND_VER">PEND_VER</option>
-          </select>
-          <Button variant="outline" onClick={load}>
-            Aplicar
-          </Button>
-        </div>
-      </div>
+        )}
 
-      {loading && <div className="rounded-md border p-4 bg-white">Cargando…</div>}
-      {error && <div className="rounded-md border border-red-200 bg-red-50 text-red-700 p-3 text-sm">Error: {error}</div>}
-
-      {!loading && !error && (
-        <UsersTable
-          items={filtered}
-          onChangeRole={(row) => {
-            setSelUser(row);
-            setRoleOpen(true);
+        {/* Editor unificado */}
+        <UserEditDialog
+          open={editOpen}
+          onOpenChange={(o) => {
+            if (!o) setSelectedUser(null);
+            setEditOpen(o);
           }}
-            onChangeEstado={(row) => {
-              setSelUser(row);
-              setStatusOpen(true);
-            }}
+          user={selectedUser}
+          onSaved={async () => {
+            await load();
+          }}
         />
-      )}
-
-      <UserStatusDialog
-        open={statusOpen}
-        onOpenChange={setStatusOpen}
-        currentStatus={selUser?.EST_USU ?? "PEND_VER"}
-        onSubmit={async (newStatus) => {
-          if (!selUser) return;
-          await updateUsuarioEstado(selUser.ID_USU, newStatus);
-          await load();
-        }}
-      />
-
-      <UserRoleDialog
-        open={roleOpen}
-        onOpenChange={setRoleOpen}
-        currentRoleId={selUser?.ID_ROL ?? null}
-        onSubmit={async (newRole) => {
-          if (!selUser) return;
-          await updateUsuarioRol(selUser.ID_USU, newRole);
-          await load();
-        }}
-      />
-    </main>
+      </main>
     </Layout>
   );
 }

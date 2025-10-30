@@ -1,7 +1,7 @@
 "use client";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import ClientForm from "@/components/ClientForm";
+import ClientForm from "@/components/clientes/ClientForm";
 import { Cliente, ClienteFormData } from "@/types/client";
 
 type Props = {

@@ -2,16 +2,10 @@
 
 import Link from "next/link";
 import { User2 } from "lucide-react";
+import { Usuario } from "@/types/usuario";
 
 type Props = {
-  user: {
-    ID_USU: number;
-    ID_ROL: number;
-    USR_USU?: string;
-    COR_USU?: string;
-    NOM_USU?: string;
-    APE_USU?: string;
-  };
+  user: Usuario | null;
   onLogout: () => void;
 };
 
@@ -26,6 +20,15 @@ export default function UserMenu({ user, onLogout }: Props) {
 
   return (
     <div className="flex items-center gap-3">
+      {user.ID_ROL!=4 && (
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 text-gray-800 hover:bg-gray-50"
+          title="Panel administrativo"
+        >
+          Panel
+        </Link>
+      )}
       <Link
         href="/perfil"
         className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 text-gray-800 hover:bg-gray-50"

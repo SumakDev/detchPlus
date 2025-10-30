@@ -5,7 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import ImageUploader from "./ImageUploader";
-import { fetchCategorias, fetchMarcas, fetchModelosByMarca } from "@/lib/api/catalogos";
+import {
+  fetchCategorias,
+  fetchMarcas,
+  fetchModelosByMarca,
+} from "@/lib/api/catalogos";
+import { fetchProveedores } from "@/lib/api/proveedores";
 
 export default function ProductForm({
   producto,
@@ -28,27 +33,49 @@ export default function ProductForm({
     ORG_PRO: "COMPRA_NUEVA",
     EST_PRO: "NUEVO",
     ACT_PRO: true,
+    ID_PRV: "" as number | "",
     imageFile: null as File | null,
   });
 
-  const [categorias, setCategorias] = useState<Array<{ ID_CAT: number; NOM_CAT: string }>>([]);
-  const [marcas, setMarcas] = useState<Array<{ ID_MAR: number; NOM_MAR: string }>>([]);
-  const [modelos, setModelos] = useState<Array<{ ID_MOD: string; NOM_MOD: string }>>([]);
+  const [categorias, setCategorias] = useState<
+    Array<{ ID_CAT: number; NOM_CAT: string }>
+  >([]);
+  const [marcas, setMarcas] = useState<
+    Array<{ ID_MAR: number; NOM_MAR: string }>
+  >([]);
+  const [modelos, setModelos] = useState<
+    Array<{ ID_MOD: string; NOM_MOD: string }>
+  >([]);
+  const [proveedores, setProveedores] = useState<
+    Array<{ ID_PRV: number; NOM_PRV: string }>
+  >([]);
   const [existingImg, setExistingImg] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    fetchCategorias().then(setCategorias).catch(() => setCategorias([]));
-    fetchMarcas().then(setMarcas).catch(() => setMarcas([]));
+    fetchCategorias()
+      .then(setCategorias)
+      .catch(() => setCategorias([]));
+    fetchMarcas()
+      .then(setMarcas)
+      .catch(() => setMarcas([]));
   }, []);
 
   useEffect(() => {
     if (form.ID_MAR) {
-      fetchModelosByMarca(Number(form.ID_MAR)).then(setModelos).catch(() => setModelos([]));
+      fetchModelosByMarca(Number(form.ID_MAR))
+        .then(setModelos)
+        .catch(() => setModelos([]));
     } else {
       setModelos([]);
       setForm((p) => ({ ...p, ID_MOD: "" }));
     }
   }, [form.ID_MAR]);
+
+  useEffect(() => {
+    fetchProveedores()
+      .then(setProveedores)
+      .catch(() => setProveedores([]));
+  }, []);
 
   useEffect(() => {
     if (producto) {
@@ -62,17 +89,34 @@ export default function ProductForm({
         ORG_PRO: producto.ORG_PRO,
         EST_PRO: producto.EST_PRO,
         ACT_PRO: !!producto.ACT_PRO,
+        ID_PRV: producto.ID_PRV ?? "",
         imageFile: null,
       });
       setExistingImg(producto.IMG_URL);
     }
   }, [producto]);
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
+  function handleChange(
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) {
     const { name, value, type } = e.target as any;
-    if (type === "checkbox") return setForm((p) => ({ ...p, [name]: (e.target as HTMLInputElement).checked }));
-    if (name === "ID_MAR") return setForm((p) => ({ ...p, ID_MAR: value ? Number(value) : "", ID_MOD: "" }));
-    if (name === "ID_CAT") return setForm((p) => ({ ...p, ID_CAT: value ? Number(value) : "" }));
+    if (type === "checkbox")
+      return setForm((p) => ({
+        ...p,
+        [name]: (e.target as HTMLInputElement).checked,
+      }));
+    if (name === "ID_MAR")
+      return setForm((p) => ({
+        ...p,
+        ID_MAR: value ? Number(value) : "",
+        ID_MOD: "",
+      }));
+    if (name === "ID_CAT")
+      return setForm((p) => ({ ...p, ID_CAT: value ? Number(value) : "" }));
+    if (name === "ID_PRV")
+      return setForm((p) => ({ ...p, ID_PRV: value ? Number(value) : "" }));
     setForm((p) => ({ ...p, [name]: value }));
   }
 
@@ -88,24 +132,44 @@ export default function ProductForm({
     fd.append("ORG_PRO", form.ORG_PRO);
     fd.append("EST_PRO", form.EST_PRO);
     fd.append("ACT_PRO", String(!!form.ACT_PRO));
+    if (form.ID_PRV) fd.append("ID_PRV", String(form.ID_PRV));
     if (form.imageFile) fd.append("image", form.imageFile);
     await onSubmit(fd);
   }
 
   return (
-    <form onSubmit={submit} className="bg-white border rounded-lg p-4 space-y-4">
+    <form
+      onSubmit={submit}
+      className="bg-white border rounded-lg p-4 space-y-4"
+    >
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="grid gap-2">
           <Label htmlFor="COD_BAR_PRO">Código/Barcode</Label>
-          <Input id="COD_BAR_PRO" name="COD_BAR_PRO" value={form.COD_BAR_PRO} onChange={handleChange} placeholder="COD-123" />
+          <Input
+            id="COD_BAR_PRO"
+            name="COD_BAR_PRO"
+            value={form.COD_BAR_PRO}
+            onChange={handleChange}
+            placeholder="COD-123"
+          />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="IME_PRO">IMEI (opcional)</Label>
-          <Input id="IME_PRO" name="IME_PRO" value={form.IME_PRO} onChange={handleChange} />
+          <Input
+            id="IME_PRO"
+            name="IME_PRO"
+            value={form.IME_PRO}
+            onChange={handleChange}
+          />
         </div>
         <div className="grid gap-2">
           <Label>Estado</Label>
-          <select name="EST_PRO" value={form.EST_PRO} onChange={handleChange} className="border rounded px-2 py-2 text-sm">
+          <select
+            name="EST_PRO"
+            value={form.EST_PRO}
+            onChange={handleChange}
+            className="border rounded px-2 py-2 text-sm"
+          >
             <option value="NUEVO">NUEVO</option>
             <option value="USADO_EXCELENTE">USADO_EXCELENTE</option>
             <option value="USADO_BUENO">USADO_BUENO</option>
@@ -117,19 +181,35 @@ export default function ProductForm({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="grid gap-2">
           <Label>Categoría</Label>
-          <select name="ID_CAT" value={form.ID_CAT} onChange={handleChange} className="border rounded px-2 py-2 text-sm" required>
+          <select
+            name="ID_CAT"
+            value={form.ID_CAT}
+            onChange={handleChange}
+            className="border rounded px-2 py-2 text-sm"
+            required
+          >
             <option value="">Seleccionar</option>
             {categorias.map((c) => (
-              <option key={c.ID_CAT} value={c.ID_CAT}>{c.NOM_CAT}</option>
+              <option key={c.ID_CAT} value={c.ID_CAT}>
+                {c.NOM_CAT}
+              </option>
             ))}
           </select>
         </div>
         <div className="grid gap-2">
           <Label>Marca</Label>
-          <select name="ID_MAR" value={form.ID_MAR} onChange={handleChange} className="border rounded px-2 py-2 text-sm" required>
+          <select
+            name="ID_MAR"
+            value={form.ID_MAR}
+            onChange={handleChange}
+            className="border rounded px-2 py-2 text-sm"
+            required
+          >
             <option value="">Seleccionar</option>
             {marcas.map((m) => (
-              <option key={m.ID_MAR} value={m.ID_MAR}>{m.NOM_MAR}</option>
+              <option key={m.ID_MAR} value={m.ID_MAR}>
+                {m.NOM_MAR}
+              </option>
             ))}
           </select>
         </div>
@@ -144,15 +224,38 @@ export default function ProductForm({
           >
             <option value="">(opcional)</option>
             {modelos.map((m) => (
-              <option key={m.ID_MOD} value={m.ID_MOD}>{m.NOM_MOD}</option>
+              <option key={m.ID_MOD} value={m.ID_MOD}>
+                {m.NOM_MOD}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="grid gap-2">
+          <Label>Proveedor</Label>
+          <select
+            name="ID_PRV"
+            value={form.ID_PRV ? String(form.ID_PRV) : ""}
+            onChange={handleChange}
+            className="border rounded px-2 py-2 text-sm"
+          >
+            <option value="">Seleccionar</option>
+            {proveedores.map((p) => (
+              <option key={p.ID_PRV} value={p.ID_PRV}>
+                {p.NOM_PRV}
+              </option>
             ))}
           </select>
         </div>
       </div>
-
       <div className="grid gap-2">
         <Label htmlFor="DES_PRO">Descripción</Label>
-        <textarea id="DES_PRO" name="DES_PRO" value={form.DES_PRO} onChange={handleChange} className="min-h-[80px] border rounded px-3 py-2 text-sm" />
+        <textarea
+          id="DES_PRO"
+          name="DES_PRO"
+          value={form.DES_PRO}
+          onChange={handleChange}
+          className="min-h-[80px] border rounded px-3 py-2 text-sm"
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -165,9 +268,15 @@ export default function ProductForm({
         />
         {existingImg && (
           <div>
-            <Label className="text-sm font-medium text-gray-700">Imagen actual</Label>
+            <Label className="text-sm font-medium text-gray-700">
+              Imagen actual
+            </Label>
             <div className="mt-2">
-              <img src={existingImg} alt="actual" className="h-24 w-24 object-cover rounded border" />
+              <img
+                src={existingImg}
+                alt="actual"
+                className="h-24 w-24 object-cover rounded border"
+              />
             </div>
           </div>
         )}
@@ -175,12 +284,21 @@ export default function ProductForm({
 
       <div className="flex items-center gap-4">
         <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-          <input type="checkbox" name="ACT_PRO" checked={!!form.ACT_PRO} onChange={handleChange} />
+          <input
+            type="checkbox"
+            name="ACT_PRO"
+            checked={!!form.ACT_PRO}
+            onChange={handleChange}
+          />
           Activo
         </label>
         <div className="grow" />
-        <Button variant="outline" type="button" onClick={onCancel}>Cancelar</Button>
-        <Button type="submit">{isEditing ? "Guardar cambios" : "Crear producto"}</Button>
+        <Button variant="outline" type="button" onClick={onCancel}>
+          Cancelar
+        </Button>
+        <Button type="submit">
+          {isEditing ? "Guardar cambios" : "Crear producto"}
+        </Button>
       </div>
     </form>
   );

@@ -5,12 +5,10 @@ import type { Usuario } from "@/types/usuario";
 
 export default function UsersTable({
   items,
-  onChangeRole,
-  onChangeEstado,
+  onEditUser,
 }: {
   items: Usuario[];
-  onChangeRole: (row: Usuario) => void;
-  onChangeEstado: (row: Usuario) => void;
+  onEditUser: (row: Usuario) => void;
 }) {
   return (
     <div className="overflow-x-auto rounded-lg border bg-white">
@@ -23,6 +21,8 @@ export default function UsersTable({
             <th className="p-3">Email</th>
             <th className="p-3">Rol</th>
             <th className="p-3">Estado</th>
+            <th className="p-3">Tipo de usuario</th>
+            <th className="p-3">CEDULA</th>
             <th className="p-3 w-48">Acciones</th>
           </tr>
         </thead>
@@ -54,13 +54,12 @@ export default function UsersTable({
                   {u.EST_USU}
                 </span>
               </td>
+              <td className="p-3">{u.TIPO_PERSONA}</td>
+              <td className="p-3">{u.ID_PERSONA}</td>
               <td className="p-3">
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" onClick={() => onChangeRole(u)}>
-                    Cambiar rol
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => onChangeEstado(u)}>
-                    Cambiar estado
+                  <Button variant="outline" size="sm" onClick={() => onEditUser(u)}>
+                    Editar
                   </Button>
                 </div>
               </td>

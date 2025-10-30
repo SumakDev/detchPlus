@@ -11,6 +11,26 @@ function nombreProducto(t: DetTelefono) {
   return nm || `${t.ID_PRO}`;
 }
 
+function getCircleClass(value: number | null | undefined) {
+  if (value == null || isNaN(value))
+    return "bg-gray-200 text-gray-600 border-gray-300"; // sin valor
+  if (value <= 6) return "bg-red-100 text-red-700 border-red-300";
+  if (value <= 8) return "bg-orange-100 text-orange-700 border-orange-300";
+  return "bg-green-100 text-green-700 border-green-300";
+}
+
+// 🔸 Componente para mostrar el valor dentro de un círculo
+function CircleValue({ value }: { value: number | null | undefined }) {
+  return (
+    <div
+      className={`inline-flex items-center justify-center w-9 h-9 rounded-full border text-sm font-semibold ${getCircleClass(
+        value
+      )}`}
+    >
+      {value != null ? `${value}0%` : "-"}
+    </div>
+  );
+}
 export default function TelefonosTable({
   items,
   onEdit,
@@ -62,12 +82,22 @@ export default function TelefonosTable({
                 </div>
               </td>
               <td className="p-3">{t.COL_TEL || "-"}</td>
-              <td className="p-3">{t.ALM_TEL || "-"}</td>
-              <td className="p-3">{t.EST_BAT_TEL ?? "-"}</td>
-              <td className="p-3">{t.EST_PAN_TEL ?? "-"}</td>
-              <td className="p-3">{t.EST_CAR_TEL ?? "-"}</td>
-              <td className="p-3">{t.EST_CAM_TEL ?? "-"}</td>
-              <td className="p-3">{t.EST_SOF_TEL ?? "-"}</td>
+              <td className="p-3">{t.ALM_TEL || "-"} GB</td>
+             <td className="p-3 text-center">
+                <CircleValue value={t.EST_BAT_TEL} />
+              </td>
+              <td className="p-3 text-center">
+                <CircleValue value={t.EST_PAN_TEL} />
+              </td>
+              <td className="p-3 text-center">
+                <CircleValue value={t.EST_CAR_TEL} />
+              </td>
+              <td className="p-3 text-center">
+                <CircleValue value={t.EST_CAM_TEL} />
+              </td>
+              <td className="p-3 text-center">
+                <CircleValue value={t.EST_SOF_TEL} />
+              </td>
               <td className="p-3">
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" onClick={() => onEdit(t)}>Editar</Button>

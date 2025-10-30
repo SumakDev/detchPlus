@@ -122,7 +122,7 @@ export default function ServicioTecnicoPage() {
             >
               <option value="">Todos</option>
               <option value="RECIBIDO">RECIBIDO</option>
-              <option value="EN_PROCESO">EN_PROCESO</option>
+              <option value="EN_PROCESO">EN PROCESO</option>
               <option value="TERMINADO">TERMINADO</option>
               <option value="ENTREGADO">ENTREGADO</option>
             </select>

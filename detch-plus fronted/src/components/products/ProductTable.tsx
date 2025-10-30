@@ -43,6 +43,9 @@ export default function ProductTable({
               <td className="p-3 font-medium text-gray-900">
                 {p.NOMBRE}
                 {p.DES_PRO ? <div className="text-xs text-gray-500 truncate max-w-xs">{p.DES_PRO}</div> : null}
+                {p.ID_PRV && p.proveedor ? (
+                  <div className="text-xs text-gray-400">Proveedor: {p.proveedor.NOM_PRV}</div>
+                ) : null}
               </td>
               <td className="p-3">{p.COD_BAR_PRO || "-"}</td>
               <td className="p-3">{p.marca?.NOM_MAR || "-"}</td>

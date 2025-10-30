@@ -21,7 +21,7 @@ export default function PerfilUsuarioPage() {
   const [edit, setEdit] = useState(false);
   const [passOpen, setPassOpen] = useState(false);
 
-  const [form, setForm] = useState({ USR_USU: "", COR_USU: "", NOM_USU: "", APE_USU: "" });
+  const [form, setForm] = useState({ USR_USU: "", COR_USU: "", NOM_USU: "", APE_USU: "", TIPO_PERSONA: "", ID_PERSONA: "" });
   const [pwd, setPwd] = useState({ current: "", next: "", confirm: "" });
 
   useEffect(() => {
@@ -45,6 +45,8 @@ export default function PerfilUsuarioPage() {
         COR_USU: user.COR_USU || "",
         NOM_USU: user.NOM_USU || "",
         APE_USU: user.APE_USU || "",
+        TIPO_PERSONA: user.TIPO_PERSONA || "",
+        ID_PERSONA: user.ID_PERSONA || "",
       });
     } catch (e: any) {
       setErr(e?.message || "Error al cargar perfil");
@@ -61,8 +63,10 @@ export default function PerfilUsuarioPage() {
       COR_USU: form.COR_USU.trim(),
       NOM_USU: form.NOM_USU.trim(),
       APE_USU: form.APE_USU.trim(),
+      ID_PERSONA: form.ID_PERSONA.trim(),
     };
     const { user } = await updateProfile(patch);
+    localStorage.setItem("auth_user", JSON.stringify(user));
     setMe(user);
     setEdit(false);
   }
@@ -71,6 +75,7 @@ export default function PerfilUsuarioPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const { user } = await updateAvatar(file);
+    localStorage.setItem("auth_user", JSON.stringify(user));
     setMe(user);
   }
 
@@ -151,6 +156,14 @@ export default function PerfilUsuarioPage() {
                     value={form.APE_USU}
                     onChange={(e) => setForm((f) => ({ ...f, APE_USU: e.target.value }))}
                     disabled={!edit}
+                  />
+                </div>
+                <div>
+                  <Label>Cedula </Label>
+                  <Input
+                    value={form.ID_PERSONA}
+                    onChange={(e) => setForm((f) => ({ ...f, ID_PERSONA: e.target.value }))}
+                    disabled={true}
                   />
                 </div>
               </div>

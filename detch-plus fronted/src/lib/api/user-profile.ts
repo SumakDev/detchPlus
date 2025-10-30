@@ -40,7 +40,7 @@ export async function getProfile() {
   return data;
 }
 
-export async function updateProfile(patch: Partial<Pick<MeProfile, "NOM_USU" | "APE_USU" | "COR_USU" | "USR_USU">>) {
+export async function updateProfile(patch: Partial<Pick<MeProfile, "NOM_USU" | "APE_USU" | "COR_USU" | "USR_USU" | "TIPO_PERSONA" | "ID_PERSONA">>) {
   const res = await fetch(`${API}/perfil/me`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...getAuthHeaders() },

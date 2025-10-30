@@ -315,7 +315,7 @@ export default function TelefonosPage() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Teléfonos</h1>
-            <p className="text-gray-600">Detalle 1:1 por producto (marca, modelo y especificaciones)</p>
+            <p className="text-gray-600">(marca, modelo y especificaciones)</p>
           </div>
           <div className="flex items-center gap-2">
             <Button onClick={() => setOpenNew(true)}>Nuevo detalle</Button>

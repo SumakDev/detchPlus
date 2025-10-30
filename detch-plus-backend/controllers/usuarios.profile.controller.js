@@ -19,7 +19,7 @@ function isValidEmail(x) {
 export async function getMeProfile(req, res) {
   try {
     const user = await USUARIOS.findByPk(req.user.ID_USU, {
-      attributes: ["ID_USU", "USR_USU", "COR_USU", "NOM_USU", "APE_USU", "ID_ROL", "EST_USU", "AVA_USU"],
+      attributes: ["ID_USU", "USR_USU", "COR_USU", "NOM_USU", "APE_USU", "TIPO_PERSONA", "ID_PERSONA", "ID_ROL", "EST_USU", "AVA_USU"],
     });
     if (!user) return res.status(401).json({ error: "No autenticado" });
     return res.json({ user: sanitizeUser(user) });
@@ -56,7 +56,7 @@ export async function updateMeProfile(req, res) {
     await user.update(patch);
 
     const refreshed = await USUARIOS.findByPk(user.ID_USU, {
-      attributes: ["ID_USU", "USR_USU", "COR_USU", "NOM_USU", "APE_USU", "ID_ROL", "EST_USU", "AVA_USU"],
+      attributes: ["ID_USU", "USR_USU", "COR_USU", "NOM_USU", "APE_USU", "TIPO_PERSONA", "ID_PERSONA", "ID_ROL", "EST_USU", "AVA_USU"],
     });
     return res.json({ user: sanitizeUser(refreshed) });
   } catch (e) {
@@ -113,7 +113,7 @@ export async function updateMyAvatar(req, res) {
     await user.update({ AVA_USU: req.file.filename });
 
     const refreshed = await USUARIOS.findByPk(user.ID_USU, {
-      attributes: ["ID_USU", "USR_USU", "COR_USU", "NOM_USU", "APE_USU", "ID_ROL", "EST_USU", "AVA_USU"],
+      attributes: ["ID_USU", "USR_USU", "COR_USU", "NOM_USU", "APE_USU", "TIPO_PERSONA", "ID_PERSONA", "ID_ROL", "EST_USU", "AVA_USU"],
     });
     return res.json({ user: sanitizeUser(refreshed) });
   } catch (e) {

@@ -1,6 +1,7 @@
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
 import { Usuario } from "@/types/usuario";
+
 function getAuthHeaders(): Record<string, string> {
   if (typeof window === "undefined") return {};
   const token = localStorage.getItem("auth_token");
@@ -20,8 +21,6 @@ async function handleJson(res: Response) {
   return json;
 }
 
-
-
 export type RolOption = { ID_ROL: number; NOM_ROL: string; DES_ROL?: string };
 
 export async function fetchUsuarios(params?: { q?: string; rol?: number; est?: string }) {
@@ -36,6 +35,7 @@ export async function fetchUsuarios(params?: { q?: string; rol?: number; est?: s
   return handleJson(res) as Promise<Usuario[]>;
 }
 
+// En tu backend expusiste roles en /roles
 export async function fetchRoles(): Promise<RolOption[]> {
   const res = await fetch(`${API}/roles`, {
     headers: { ...getAuthHeaders() },
@@ -60,4 +60,39 @@ export async function updateUsuarioEstado(id: number, EST_USU: Usuario["EST_USU"
     body: JSON.stringify({ EST_USU }),
   });
   return handleJson(res) as Promise<Usuario & { message?: string }>;
+}
+
+// NUEVO: actualización unificada
+export async function updateUsuario(
+  id: number,
+  patch: Partial<Pick<Usuario, "ID_ROL" | "EST_USU" | "TIPO_PERSONA" | "ID_PERSONA">>
+) {
+  const res = await fetch(`${API}/usuarios/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify(patch),
+  });
+  return handleJson(res) as Promise<Usuario>;
+}
+
+// Tipos mínimos para validación
+export type ClienteMin = { CED_CLI: string; NOM_CLI?: string; APE_CLI?: string };
+export type EmpleadoMin = { CED_EMP: string; NOM_EMP?: string; APE_EMP?: string };
+
+// GET /clientes/:cedula
+export async function fetchClienteByCedula(cedula: string): Promise<ClienteMin> {
+  const res = await fetch(`${API}/clientes/${encodeURIComponent(cedula)}`, {
+    headers: { ...getAuthHeaders() },
+    cache: "no-store",
+  });
+  return handleJson(res) as Promise<ClienteMin>;
+}
+
+// GET /empleados/:cedula
+export async function fetchEmpleadoByCedula(cedula: string): Promise<EmpleadoMin> {
+  const res = await fetch(`${API}/empleados/${encodeURIComponent(cedula)}`, {
+    headers: { ...getAuthHeaders() },
+    cache: "no-store",
+  });
+  return handleJson(res) as Promise<EmpleadoMin>;
 }

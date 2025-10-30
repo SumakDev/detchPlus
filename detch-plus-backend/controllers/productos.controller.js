@@ -3,7 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { Op } from "sequelize";
 import sequelize from "../config/database.js";
-import { PRODUCTOS, CATEGORIAS, MARCAS, MODELOS, STOCK } from "../models/index.js";
+import { PRODUCTOS, CATEGORIAS, MARCAS, MODELOS, STOCK, PROVEEDORES} from "../models/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,6 +41,7 @@ export async function getAll(req, res) {
       { model: CATEGORIAS, as: "categoria", attributes: ["ID_CAT", "NOM_CAT"], required: false },
       { model: MARCAS, as: "marca", attributes: ["ID_MAR", "NOM_MAR"], required: false },
       { model: MODELOS, as: "modelo", attributes: ["ID_MOD", "NOM_MOD", "ID_MAR"], required: false },
+      { model: PROVEEDORES, as: "proveedor", attributes: ["ID_PRV", "NOM_PRV"], required: false },
     ];
 
     const rows = await PRODUCTOS.findAll({
@@ -54,6 +55,7 @@ export async function getAll(req, res) {
             // Campos de las relaciones incluidas
             { "$marca.NOM_MAR$": { [Op.like]: like } },
             { "$modelo.NOM_MOD$": { [Op.like]: like } },
+            { "$proveedor.NOM_PRV$": { [Op.like]: like } },
           ],
         }
         : where,
@@ -78,13 +80,14 @@ export async function create(req, res) {
     const file = req.file;
     console.log("POST /productos -> file?", !!file, "body keys:", Object.keys(body));
     // Validaciones relacionales
-    const [cat, mar, mod] = await Promise.all([
+    const [cat, mar, mod, prov] = await Promise.all([
       CATEGORIAS.findByPk(body.ID_CAT, { transaction: t }),
       MARCAS.findByPk(body.ID_MAR, { transaction: t }),
       body.ID_MOD ? MODELOS.findByPk(body.ID_MOD, { transaction: t }) : null,
     ]);
     if (!cat) return res.status(400).json({ error: "Categoría inválida" });
     if (!mar) return res.status(400).json({ error: "Marca inválida" });
+    if (!prov) return res.status(400).json({ error: "Proveedor inválido" });
     if (body.ID_MOD) {
       if (!mod) return res.status(400).json({ error: "Modelo inválido" });
       if (Number(mod.ID_MAR) !== Number(body.ID_MAR)) {
@@ -103,7 +106,7 @@ export async function create(req, res) {
         ORG_PRO: body.ORG_PRO, // COMPRA_NUEVA | PARTE_PAGO | CONSIGNACION
         EST_PRO: body.EST_PRO, // NUEVO | USADO_EXCELENTE | USADO_BUENO | USADO_REGULAR
         FEC_ING_PRO: body.FEC_ING_PRO ? new Date(body.FEC_ING_PRO) : new Date(),
-        ID_PRV: body.ID_PRV ? Number(body.ID_PRV) : null,
+        ID_PRV: Number(body.ID_PRV) || null,
         ACT_PRO: body.ACT_PRO !== undefined ? (String(body.ACT_PRO) === "true" || body.ACT_PRO === true) : true,
         FEC_MOD_PRO: new Date(),
         IMG_URL: file ? file.filename : null,
@@ -129,6 +132,7 @@ export async function create(req, res) {
         { model: CATEGORIAS, as: "categoria", attributes: ["ID_CAT", "NOM_CAT"] },
         { model: MARCAS, as: "marca", attributes: ["ID_MAR", "NOM_MAR"] },
         { model: MODELOS, as: "modelo", attributes: ["ID_MOD", "NOM_MOD", "ID_MAR"] },
+        { model: PROVEEDORES, as: "proveedor", attributes: ["ID_PRV", "NOM_PRV"] },
       ],
       transaction: t,
     });
@@ -158,10 +162,13 @@ export async function update(req, res) {
     if (body.ID_MAR || body.ID_MOD) {
       const mar = body.ID_MAR ? await MARCAS.findByPk(body.ID_MAR) : null;
       const mod = body.ID_MOD ? await MODELOS.findByPk(body.ID_MOD) : null;
+      const prov = body.ID_PRV ? await PROVEEDORES.findByPk(body.ID_PRV) : null;
       if (body.ID_MAR && !mar) return res.status(400).json({ error: "Marca inválida" });
       if (body.ID_MOD && !mod) return res.status(400).json({ error: "Modelo inválido" });
+      if (body.ID_PRV && !prov) return res.status(400).json({ error: "Proveedor inválido" });
       const effMar = Number(body.ID_MAR ?? row.ID_MAR);
       const effMod = body.ID_MOD ?? row.ID_MOD;
+      
       if (effMod) {
         const checkMod = mod || (await MODELOS.findByPk(effMod));
         if (checkMod && Number(checkMod.ID_MAR) !== effMar) {
@@ -194,6 +201,7 @@ export async function update(req, res) {
         { model: CATEGORIAS, as: "categoria", attributes: ["ID_CAT", "NOM_CAT"] },
         { model: MARCAS, as: "marca", attributes: ["ID_MAR", "NOM_MAR"] },
         { model: MODELOS, as: "modelo", attributes: ["ID_MOD", "NOM_MOD", "ID_MAR"] },
+        { model: PROVEEDORES, as: "proveedor", attributes: ["ID_PRV", "NOM_PRV"] },
       ],
     });
 
