@@ -45,9 +45,6 @@ export async function create(req, res) {
     return res.status(201).json(toUi(result));
   } catch (error) {
     console.error("productos.create", error);
-    if (error?.name === "SequelizeUniqueConstraintError") {
-      return res.status(409).json({ error: "Código de barras duplicado" });
-    }
     return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
   }
 }

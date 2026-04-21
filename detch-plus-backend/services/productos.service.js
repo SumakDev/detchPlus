@@ -8,6 +8,15 @@ function serviceError(message, status = 400) {
   return err;
 }
 
+async function validateModeloBelongsToMarca(idMod, idMar, t = undefined) {
+  const mod = await MODELOS.findByPk(idMod, t ? { transaction: t } : {});
+  if (!mod) throw serviceError("Modelo inválido");
+  if (Number(mod.ID_MAR) !== Number(idMar)) {
+    throw serviceError("El modelo no pertenece a la marca seleccionada");
+  }
+  return mod;
+}
+
 export async function getProductos({ q, activo } = {}) {
   const where = {};
   if (activo === "true") where.ACT_PRO = true;
@@ -17,55 +26,58 @@ export async function getProductos({ q, activo } = {}) {
 }
 
 export async function createProducto(body, file) {
-  return sequelize.transaction(async (t) => {
-    const [cat, mar, mod] = await Promise.all([
-      CATEGORIAS.findByPk(body.ID_CAT, { transaction: t }),
-      MARCAS.findByPk(body.ID_MAR, { transaction: t }),
-      body.ID_MOD ? MODELOS.findByPk(body.ID_MOD, { transaction: t }) : null,
-    ]);
+  try {
+    return await sequelize.transaction(async (t) => {
+      const [cat, mar] = await Promise.all([
+        CATEGORIAS.findByPk(body.ID_CAT, { transaction: t }),
+        MARCAS.findByPk(body.ID_MAR, { transaction: t }),
+      ]);
 
-    if (!cat) throw serviceError("Categoría inválida");
-    if (!mar) throw serviceError("Marca inválida");
-    if (body.ID_MOD) {
-      if (!mod) throw serviceError("Modelo inválido");
-      if (Number(mod.ID_MAR) !== Number(body.ID_MAR)) {
-        throw serviceError("El modelo no pertenece a la marca seleccionada");
+      if (!cat) throw serviceError("Categoría inválida");
+      if (!mar) throw serviceError("Marca inválida");
+      if (body.ID_MOD) {
+        await validateModeloBelongsToMarca(body.ID_MOD, body.ID_MAR, t);
       }
+
+      const created = await repo.create(
+        {
+          COD_BAR_PRO: body.COD_BAR_PRO || null,
+          IME_PRO: body.IME_PRO || null,
+          ID_CAT: Number(body.ID_CAT),
+          ID_MAR: Number(body.ID_MAR),
+          ID_MOD: body.ID_MOD || null,
+          DES_PRO: body.DES_PRO || null,
+          ORG_PRO: body.ORG_PRO,
+          EST_PRO: body.EST_PRO,
+          FEC_ING_PRO: body.FEC_ING_PRO ? new Date(body.FEC_ING_PRO) : new Date(),
+          ID_PRV: body.ID_PRV ? Number(body.ID_PRV) : null,
+          ACT_PRO: body.ACT_PRO !== undefined ? (String(body.ACT_PRO) === "true" || body.ACT_PRO === true) : true,
+          FEC_MOD_PRO: new Date(),
+          IMG_URL: file ? file.filename : null,
+        },
+        { transaction: t }
+      );
+
+      await STOCK.create(
+        {
+          ID_PRO: created.ID_PRO,
+          CAN_DIS_STO: 0,
+          CAN_RES_STO: 0,
+          STO_MIN: 1,
+          STO_MAX: 100,
+          FEC_ACT_STO: new Date(),
+        },
+        { transaction: t }
+      );
+
+      return repo.findByPkWithInclude(created.ID_PRO, { transaction: t });
+    });
+  } catch (error) {
+    if (error?.name === "SequelizeUniqueConstraintError") {
+      throw serviceError("Código de barras duplicado", 409);
     }
-
-    const created = await repo.create(
-      {
-        COD_BAR_PRO: body.COD_BAR_PRO || null,
-        IME_PRO: body.IME_PRO || null,
-        ID_CAT: Number(body.ID_CAT),
-        ID_MAR: Number(body.ID_MAR),
-        ID_MOD: body.ID_MOD || null,
-        DES_PRO: body.DES_PRO || null,
-        ORG_PRO: body.ORG_PRO,
-        EST_PRO: body.EST_PRO,
-        FEC_ING_PRO: body.FEC_ING_PRO ? new Date(body.FEC_ING_PRO) : new Date(),
-        ID_PRV: body.ID_PRV ? Number(body.ID_PRV) : null,
-        ACT_PRO: body.ACT_PRO !== undefined ? (String(body.ACT_PRO) === "true" || body.ACT_PRO === true) : true,
-        FEC_MOD_PRO: new Date(),
-        IMG_URL: file ? file.filename : null,
-      },
-      { transaction: t }
-    );
-
-    await STOCK.create(
-      {
-        ID_PRO: created.ID_PRO,
-        CAN_DIS_STO: 0,
-        CAN_RES_STO: 0,
-        STO_MIN: 1,
-        STO_MAX: 100,
-        FEC_ACT_STO: new Date(),
-      },
-      { transaction: t }
-    );
-
-    return repo.findByPkWithInclude(created.ID_PRO, { transaction: t });
-  });
+    throw error;
+  }
 }
 
 export async function updateProducto(id, body, file) {
@@ -73,17 +85,14 @@ export async function updateProducto(id, body, file) {
   if (!row) throw serviceError("No encontrado", 404);
 
   if (body.ID_MAR || body.ID_MOD) {
-    const mar = body.ID_MAR ? await MARCAS.findByPk(body.ID_MAR) : null;
-    const mod = body.ID_MOD ? await MODELOS.findByPk(body.ID_MOD) : null;
-    if (body.ID_MAR && !mar) throw serviceError("Marca inválida");
-    if (body.ID_MOD && !mod) throw serviceError("Modelo inválido");
+    if (body.ID_MAR) {
+      const mar = await MARCAS.findByPk(body.ID_MAR);
+      if (!mar) throw serviceError("Marca inválida");
+    }
     const effMar = Number(body.ID_MAR ?? row.ID_MAR);
     const effMod = body.ID_MOD ?? row.ID_MOD;
     if (effMod) {
-      const checkMod = mod || (await MODELOS.findByPk(effMod));
-      if (checkMod && Number(checkMod.ID_MAR) !== effMar) {
-        throw serviceError("El modelo no pertenece a la marca");
-      }
+      await validateModeloBelongsToMarca(effMod, effMar);
     }
   }
 
