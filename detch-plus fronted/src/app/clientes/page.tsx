@@ -2,22 +2,24 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Layout from "@/components/Layout";
-import ClientUpsertDialog from "@/components/ClientUpsertDialog";
-import ClientTable from "@/components/ClientTable";
+import ClientUpsertDialog from "@/components/clientes/ClientUpsertDialog";
+import ClientTable from "@/components/clientes/ClientTable";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Cliente, ClienteFormData } from "@/types/client";
 import { Plus, Users, UserCheck, UserX } from "lucide-react";
 import { fetchClientes, createCliente, updateCliente, deleteCliente } from "@/lib/api/clients";
+import ClienteDetalleDialog from "@/components/clientes/clienteDetalleDialog";
 
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [openView, setOpenView] = useState(false);
+  const [selected, setSelected] = useState<Cliente | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [openUpsert, setOpenUpsert] = useState(false);
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
-  const [viewingCliente, setViewingCliente] = useState<Cliente | null>(null);
 
   async function loadClientes() {
     try {
@@ -140,50 +142,8 @@ export default function ClientesPage() {
           </Card>
         )}
 
-        {/* Detalle */}
-        {viewingCliente && (
-          <Card className="max-w-2xl mx-auto">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-xl font-semibold">Detalles del Cliente</h3>
-                <Button variant="outline" onClick={() => setViewingCliente(null)}>
-                  Cerrar
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <strong>Cédula/RUC:</strong> {viewingCliente.CED_CLI}
-                </div>
-                <div>
-                  <strong>Nombre:</strong> {viewingCliente.NOM_CLI} {viewingCliente.APE_CLI}
-                </div>
-                <div>
-                  <strong>Correo:</strong> {viewingCliente.COR_CLI || "No especificado"}
-                </div>
-                <div>
-                  <strong>Teléfono:</strong> {viewingCliente.NUM_CLI || "No especificado"}
-                </div>
-                <div>
-                  <strong>Dirección:</strong> {viewingCliente.DIR_CLI || "No especificada"}
-                </div>
-                <div>
-                  <strong>Dificultad:</strong> {viewingCliente.DIF_CLI}
-                </div>
-                <div>
-                  <strong>Estado:</strong> {viewingCliente.ACTIVO ? "Activo" : "Inactivo"}
-                </div>
-                <div>
-                  <strong>Fecha de Registro:</strong>{" "}
-                  {new Date(viewingCliente.FECHA_REGISTRO).toLocaleDateString()}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Tabla */}
-        {!loading && !error && !viewingCliente && (
+        {!loading && !error && (
           <ClientTable
             clientes={clientes}
             onEdit={(c) => {
@@ -191,7 +151,10 @@ export default function ClientesPage() {
               setOpenUpsert(true);
             }}
             onDelete={handleDeleteCliente}
-            onView={setViewingCliente}
+            onView={(c) => {
+              setSelected(c);
+              setOpenView(true);
+            }}
           />
         )}
 
@@ -205,6 +168,23 @@ export default function ClientesPage() {
           isEditing={!!editingCliente}
           cliente={editingCliente}
           onSubmit={editingCliente ? handleUpdateCliente : handleCreateCliente}
+        />
+
+        {/* Detalle con Observaciones integrado */}
+        <ClienteDetalleDialog
+          open={openView}
+          onOpenChange={(o) => {
+            if (!o) setSelected(null);
+            setOpenView(o);
+          }}
+          cliente={selected}
+          onEdit={(c) => {
+            // Abrir modal de edición desde el detalle
+            setSelected(null);
+            setOpenView(false);
+            setEditingCliente(c);
+            setOpenUpsert(true);
+          }}
         />
       </div>
     </Layout>

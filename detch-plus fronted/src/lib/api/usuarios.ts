@@ -11,6 +11,7 @@ export async function fetchUsuarios(params?: { q?: string; rol?: number; est?: s
   return apiClient.get(`/usuarios${qs.toString() ? `?${qs.toString()}` : ""}`) as Promise<Usuario[]>;
 }
 
+// En tu backend expusiste roles en /roles
 export async function fetchRoles(): Promise<RolOption[]> {
   return apiClient.get("/roles");
 }

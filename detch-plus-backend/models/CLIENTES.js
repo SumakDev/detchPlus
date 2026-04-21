@@ -12,7 +12,7 @@ const CLIENTES = sequelize.define(
     NUM_CLI: { type: DataTypes.STRING(20), allowNull: true },
     DIF_CLI: { type: DataTypes.ENUM("BAJA", "MEDIA", "ALTA"), allowNull: false, defaultValue: "BAJA" },
     ACT_CLI: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
-    FEC_REG_CLI: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW }, // <- importante
+    FEC_REG_CLI: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW }, 
   },
   { tableName: "CLIENTES", timestamps: false }
 );

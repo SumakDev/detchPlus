@@ -36,11 +36,16 @@ export async function login(req, res) {
   }
 }
 
+// GET /api/auth/me  (requiere auth)
 export async function me(req, res) {
   try {
-    if (!req.user) return res.status(401).json({ error: "No autenticado" });
-    return res.json({ user: req.user });
-  } catch {
+    const user = await USUARIOS.findByPk(req.user?.ID_USU || req.user?.sub, {
+      attributes: ["ID_USU", "USR_USU", "COR_USU", "NOM_USU", "APE_USU", "ID_ROL", "EST_USU", "AVA_USU"],
+    });
+    if (!user) return res.status(401).json({ error: "No autenticado" });
+    return res.json({ user: sanitizeUser(user) });
+  } catch (e) {
+    console.error("auth.me", e);
     return res.status(500).json({ error: "Internal server error" });
   }
 }

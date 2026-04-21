@@ -9,6 +9,8 @@ const USUARIOS = sequelize.define("USUARIOS", {
   ID_ROL: { type: DataTypes.INTEGER, allowNull: false },
   NOM_USU: { type: DataTypes.STRING(100), allowNull: false },
   APE_USU: { type: DataTypes.STRING(100), allowNull: false },
+  TIPO_PERSONA: { type: DataTypes.ENUM("CLIENTE", "EMPLEADO"), allowNull: false },
+  ID_PERSONA: { type: DataTypes.STRING(20), allowNull: false },
   TEL_USU: DataTypes.STRING(15),
   FEC_NAC_USU: DataTypes.DATEONLY,
   AVA_USU: DataTypes.STRING(255),

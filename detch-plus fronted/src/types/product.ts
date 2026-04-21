@@ -6,6 +6,7 @@ export type EstadoProducto = "NUEVO" | "USADO_EXCELENTE" | "USADO_BUENO" | "USAD
 export type CategoriaRef = { ID_CAT: number; NOM_CAT: string; DES_CAT?: string };
 export type MarcaRef = { ID_MAR: number; NOM_MAR: string; DES_MAR?: string };
 export type ModeloRef = { ID_MOD: string; NOM_MOD: string; ID_MAR: number };
+export type ProveedorRef = { ID_PRV: number; NOM_PRV: string; COR_PRV?: string };
 
 // Objeto que consume la UI
 export type Producto = {
@@ -33,6 +34,7 @@ export type Producto = {
   categoria?: CategoriaRef;
   marca?: MarcaRef;
   modelo?: ModeloRef;
+  proveedor?: ProveedorRef;
 };
 
 // Datos del formulario (antes de convertir a FormData)

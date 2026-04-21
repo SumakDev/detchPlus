@@ -34,7 +34,7 @@ export default function DashboardPage() {
   const [ventas, setVentas] = useState<VentasResumen | null>(null);
   const [stock, setStock] = useState<StockResumen | null>(null);
   const [reportes, setReportes] = useState<ReportesResumen | null>(null);
-
+  const [user, setUser] = useState<any>(null);
   const [userName, setUserName] = useState<string>("");
   const router = useRouter();
 
@@ -51,8 +51,9 @@ export default function DashboardPage() {
           router.replace("/");
           return;
         }
+        setUser(user);
         if (user.ID_ROL === 4) {
-          router.replace("/mi-cuenta");
+          router.replace("/");
           return;
         }
         const name =
@@ -137,12 +138,17 @@ export default function DashboardPage() {
           <p className="text-gray-600">Resumen general, ventas, stock y reportes</p>
         </div>
         <div className="flex items-center gap-2">
+                  <Link href="/">
+            <Button variant="outline">inicio</Button>
+          </Link>
           <Link href="/perfil">
             <Button variant="outline">Mi perfil</Button>
           </Link>
-          <Link href="/clientes">
-            <Button className="bg-gray-900 hover:bg-gray-800">Ir a Clientes</Button>
-          </Link>
+          {user?.ID_ROL != 4 && (
+            <Link href="/clientes">
+              <Button className="bg-gray-900 hover:bg-gray-800">Panel</Button>
+            </Link>
+          )}
           <Button variant="outline" onClick={logout}>
             Cerrar sesión
           </Button>

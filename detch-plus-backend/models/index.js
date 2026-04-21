@@ -8,6 +8,23 @@ import { MOV_FIN, EVA_PAR_PAG, PAR_PAG_APL, CUPONES, CUP_USO } from "./finance/i
 
 setupAssociations();
 
+// Un usuario tiene muchas sesiones
+USUARIOS.hasMany(SES_USU, { foreignKey: "ID_USU", as: "sesiones" });
+// Cada sesión pertenece a un usuario
+SES_USU.belongsTo(USUARIOS, { foreignKey: "ID_USU", as: "usuario" });
+
+// Asociación PRODUCTOS (1) — (N) PRECIOS
+PRODUCTOS.hasMany(PRECIOS, { foreignKey: "ID_PRO", as: "precios" });
+PRECIOS.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });
+
+// Relación 1:1 Producto ↔ Teléfono
+PRODUCTOS.hasOne(DET_TELE, { foreignKey: "ID_PRO", as: "telefono", onDelete: "CASCADE" });
+DET_TELE.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });
+
+// Asociación USUARIOS <-> EMPLEADOS / CLIENTES
+USUARIOS.belongsTo(EMPLEADOS, {foreignKey: "ID_PERSONA",constraints: false, as: "empleado"});
+USUARIOS.belongsTo(CLIENTES, {foreignKey: "ID_PERSONA",constraints: false, as: "cliente"});
+
 export {
   CATEGORIAS,
   MARCAS,

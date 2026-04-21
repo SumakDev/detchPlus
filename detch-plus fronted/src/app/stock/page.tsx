@@ -64,29 +64,44 @@ export default function StockPage() {
     return { total, criticos, agotados };
   }, [items]);
 
-  function exportCsv() {
-    const csv = [
-      ["ID_PRO", "Código", "Nombre", "Ubicación", "Disponible", "Reservado", "Mínimo"],
-      ...filtered.map((r) => [
-        r.id,
-        r.producto?.codigo || "",
-        r.producto?.nombre || "",
-        r.ubicacion || "",
-        r.disponible,
-        r.reservado,
-        r.minimo,
-      ]),
-    ]
-      .map((row) => row.join(","))
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "stock.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  }
+function exportCsv() {
+  const rows = [
+    ["ID_PRO", "Código", "Nombre", "Ubicación", "Disponible", "Reservado", "Mínimo"],
+    ...filtered.map((r) => [
+      r.id,
+      r.producto?.codigo || "",
+      r.producto?.nombre || "",
+      r.ubicacion || "",
+      r.disponible,
+      r.reservado,
+      r.minimo,
+    ]),
+  ];
+
+  const csvBody = rows
+    .map(row =>
+      row
+        .map(v => `"${String(v).replace(/"/g, '""')}"`)
+        .join(";")   // usar ; si tu Excel usa ; como separador
+    )
+    .join("\r\n"); // CRLF para Windows/Excel
+
+  // BOM bytes EF BB BF
+  const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+  // convertir string a Uint8Array (UTF-8)
+  const encoder = new TextEncoder(); // convierte a UTF-8
+  const bodyBytes = encoder.encode(csvBody);
+
+  // concatenar BOM + contenido
+  const blob = new Blob([bom, bodyBytes], { type: "text/csv;charset=utf-8;" });
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "stock.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
   return (
     <Layout>

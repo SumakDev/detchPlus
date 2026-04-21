@@ -38,6 +38,7 @@ import authRouter from "./auth.routes.js";
 import catalogosRouter from "./catalogos.routers.js";
 import { requireAuth, denyWebUser, requireRoles } from "../middleware/auth.js";
 import servicioTecnicoRouter from "./servicio-tecnico.routes.js";
+import usuariosProfileRouter from "./usuarios.profile.routes.js";
 
 export default function registerRoutes(app) {
   app.use("/api/servicios-tecnicos",requireAuth(),denyWebUser(), servicioTecnicoRouter);
@@ -52,8 +53,8 @@ export default function registerRoutes(app) {
   app.use("/api/det_fac", det_facRouter);
   app.use("/api/det_ped_onl", det_ped_onlRouter);
   app.use("/api/det_rel", det_relRouter);
-  app.use("/api/det_ser", det_serRouter);
-  app.use("/api/det_tele", det_teleRouter);
+  app.use("/api/det_ser", requireAuth(), denyWebUser(), det_serRouter);
+  app.use("/api/telefonos", det_teleRouter);
   app.use("/api/dir_usu", dir_usuRouter);
   app.use("/api/empleados", requireAuth(), denyWebUser(), empleadosRouter);
   app.use("/api/eva_par_pag", requireAuth(), denyWebUser(), eva_par_pagRouter);
@@ -74,8 +75,9 @@ export default function registerRoutes(app) {
   app.use("/api/res_pro", requireAuth(), denyWebUser(), res_proRouter);
   app.use("/api/roles", requireAuth(), denyWebUser(), rolesRouter);
   app.use("/api/ser_tec", requireAuth(), denyWebUser(), ser_tecRouter);
-  app.use("/api/ses_usu", requireAuth(), denyWebUser(), ses_usuRouter);
+  app.use("/api/sesiones", requireAuth(), denyWebUser(), ses_usuRouter);
   app.use("/api/stock", requireAuth(), denyWebUser(), stockRouter);
   app.use("/api/tecnicos", requireAuth(), denyWebUser(), tecnicosRouter);
   app.use("/api/usuarios", requireAuth(), denyWebUser(), usuariosRouter);
+  app.use("/api/perfil", usuariosProfileRouter);
 }

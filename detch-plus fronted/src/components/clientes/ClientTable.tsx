@@ -49,6 +49,7 @@ export default function ClientTable({ clientes, onEdit, onDelete, onView }: Prop
               </td>
               <td className="p-3">
                 <div className="flex gap-2">
+                  
                   <Button variant="outline" size="sm" onClick={() => onView(c)}>
                     Ver
                   </Button>
