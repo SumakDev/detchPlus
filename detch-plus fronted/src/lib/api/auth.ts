@@ -1,28 +1,9 @@
-const API = process.env.NEXT_PUBLIC_API_URL || "";
+import { apiClient } from "../apiClient";
 
-// Login: acepta usuario o email en "identifier"
 export async function loginApi(identifier: string, password: string) {
-  const res = await fetch(`${API}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ usuario: identifier, password }),
-  });
-  const text = await res.text();
-  let json: any = null;
-  try { json = text ? JSON.parse(text) : null; } catch {}
-  if (!res.ok) {
-    const msg =
-      (json?.error && typeof json.error === "string" && json.error) ||
-      (json?.message && typeof json.message === "string" && json.message) ||
-      text || `HTTP ${res.status}`;
-    const err = new Error(msg) as Error & { status?: number; details?: any };
-    err.status = res.status; err.details = json?.details;
-    throw err;
-  }
-  return json as { token: string; user?: any };
+  return apiClient.post("/auth/login", { usuario: identifier, password }) as Promise<{ token: string; user?: any }>;
 }
 
-// Registro: requiere usuario, email, password, nombres, apellidos y aceptaTerminos
 export async function registerApi(params: {
   usuario: string;
   email: string;
@@ -31,22 +12,5 @@ export async function registerApi(params: {
   apellidos: string;
   aceptaTerminos: boolean;
 }) {
-  const res = await fetch(`${API}/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
-  });
-  const text = await res.text();
-  let json: any = null;
-  try { json = text ? JSON.parse(text) : null; } catch {}
-  if (!res.ok) {
-    const msg =
-      (json?.error && typeof json.error === "string" && json.error) ||
-      (json?.message && typeof json.message === "string" && json.message) ||
-      text || `HTTP ${res.status}`;
-    const err = new Error(msg) as Error & { status?: number; details?: any };
-    err.status = res.status; err.details = json?.details;
-    throw err;
-  }
-  return json as { token?: string; user?: any };
+  return apiClient.post("/auth/register", params) as Promise<{ token?: string; user?: any }>;
 }
