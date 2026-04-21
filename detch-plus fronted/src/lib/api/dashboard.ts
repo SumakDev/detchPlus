@@ -1,4 +1,4 @@
-import { apiClient } from "../apiClient";
+const API = process.env.NEXT_PUBLIC_API_URL || "";
 
 export type ClienteUI = {
   CED_CLI: string;
@@ -19,8 +19,8 @@ export type VentasResumen = {
 
 export type StockResumen = {
   totalProductos: number;
-  criticos: number;
-  agotados: number;
+  criticos: number; // por debajo de mínimo
+  agotados: number; // stock 0
   topCriticos: { sku: string; nombre: string; stock: number; min: number }[];
 };
 
@@ -30,6 +30,33 @@ export type ReportesResumen = {
   recientes: { id: string | number; nombre: string; fecha: string; estado: "LISTO" | "PENDIENTE" | "ERROR" }[];
 };
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("auth_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function handleJson(res: Response) {
+  const text = await res.text();
+  let json: any = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {}
+  if (!res.ok) {
+    const msg =
+      (json?.error && typeof json.error === "string" && json.error) ||
+      (json?.message && typeof json.message === "string" && json.message) ||
+      text ||
+      `HTTP ${res.status}`;
+    const err = new Error(msg) as Error & { status?: number; details?: any };
+    err.status = res.status;
+    err.details = json?.details;
+    throw err;
+  }
+  return json;
+}
+
+// Ajusta estos endpoints a tu backend:
 const ENDPOINTS = {
   clientes: "/clientes",
   ventasResumen: "/ventas/resumen",
@@ -39,7 +66,11 @@ const ENDPOINTS = {
 
 export async function fetchClientesListado(): Promise<ClienteUI[]> {
   try {
-    const json = await apiClient.get(ENDPOINTS.clientes);
+    const res = await fetch(`${API}${ENDPOINTS.clientes}`, {
+      headers: { ...getAuthHeaders() },
+      cache: "no-store",
+    });
+    const json = await handleJson(res);
     const rows = Array.isArray(json) ? json : json?.data ?? [];
     return rows.map((c: any) => ({
       CED_CLI: c.CED_CLI,
@@ -48,14 +79,20 @@ export async function fetchClientesListado(): Promise<ClienteUI[]> {
       ACTIVO: c.ACT_CLI ?? true,
       FECHA_REGISTRO: c.FEC_REG_CLI ?? new Date().toISOString(),
     }));
-  } catch {
+  } catch (e) {
+    // si falla, devolvemos vacío para no romper el dashboard
     return [];
   }
 }
 
 export async function fetchVentasResumen(): Promise<VentasResumen> {
   try {
-    const json = await apiClient.get(ENDPOINTS.ventasResumen);
+    const res = await fetch(`${API}${ENDPOINTS.ventasResumen}`, {
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+      cache: "no-store",
+    });
+    const json = await handleJson(res);
+    // Esperado desde backend; si no existe, adaptamos
     return {
       totalHoy: Number(json.totalHoy ?? 0),
       totalHoyFmt: json.totalHoyFmt ?? `$${Number(json.totalHoy ?? 0).toFixed(2)}`,
@@ -65,13 +102,25 @@ export async function fetchVentasResumen(): Promise<VentasResumen> {
       crecimientoVsAyerPct: Number(json.crecimientoVsAyerPct ?? 0),
     };
   } catch {
-    return { totalHoy: 0, totalHoyFmt: "$0.00", totalMes: 0, ticketsHoy: 0, promedioTicket: 0, crecimientoVsAyerPct: 0 };
+    // Fallback si no tienes aún el endpoint
+    return {
+      totalHoy: 0,
+      totalHoyFmt: "$0.00",
+      totalMes: 0,
+      ticketsHoy: 0,
+      promedioTicket: 0,
+      crecimientoVsAyerPct: 0,
+    };
   }
 }
 
 export async function fetchStockResumen(): Promise<StockResumen> {
   try {
-    const json = await apiClient.get(ENDPOINTS.stockResumen);
+    const res = await fetch(`${API}${ENDPOINTS.stockResumen}`, {
+      headers: { ...getAuthHeaders() },
+      cache: "no-store",
+    });
+    const json = await handleJson(res);
     return {
       totalProductos: Number(json.totalProductos ?? 0),
       criticos: Number(json.criticos ?? 0),
@@ -91,7 +140,11 @@ export async function fetchStockResumen(): Promise<StockResumen> {
 
 export async function fetchReportesResumen(): Promise<ReportesResumen> {
   try {
-    const json = await apiClient.get(ENDPOINTS.reportesResumen);
+    const res = await fetch(`${API}${ENDPOINTS.reportesResumen}`, {
+      headers: { ...getAuthHeaders() },
+      cache: "no-store",
+    });
+    const json = await handleJson(res);
     return {
       generadosMes: Number(json.generadosMes ?? 0),
       pendientes: Number(json.pendientes ?? 0),
