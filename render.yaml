@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: detch-plus-backend
+    env: node
+    region: oregon
+    buildCommand: cd detch-plus-backend && npm install
+    startCommand: cd detch-plus-backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: JWT_SECRET
+        value: tu_secreto_muy_largo
+      - key: JWT_EXPIRES_IN
+        value: 1d
+      - key: DB_HOST
+        value: viaduct.proxy.rlwy.net
+      - key: DB_PORT
+        value: "24845"
+      - key: DB_DATABASE
+        value: detchPlus
+      - key: DB_USERNAME
+        value: root
+      - key: DB_PASSWORD
+        value: JPTzCuxsSMZGoFzSMafFaBhvQXTDIzde
+      - key: DB_CONNECTION
+        value: mysql
+      - key: WEB_ORIGIN
+        value: https://detch-plus-frontend-XXX.onrender.com
+
+  - type: web
+    name: detch-plus-frontend
+    env: node
+    region: oregon
+    buildCommand: cd "detch-plus fronted" && npm install && npm run build
+    startCommand: cd "detch-plus fronted" && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: https://detch-plus-backend-XXX.onrender.com
