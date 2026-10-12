@@ -332,14 +332,51 @@ export async function patchEstado(req, res) {
     const order = await PED_ONL.findByPk(id);
     if (!order) return res.status(404).json({ error: "Pedido no encontrado" });
 
+    const previousEstado = order.EST_PED_ONL;
     const updateFields = {};
     if (EST_PED_ONL) updateFields.EST_PED_ONL = EST_PED_ONL;
     if (EST_PAG_PED) updateFields.EST_PAG_PED = EST_PAG_PED;
     if (EST_PED_ONL === "ENTREGADO") updateFields.FEC_ENT_PED = new Date();
 
-    await order.update(updateFields);
+    // 1. Si el pedido se cancela (y no estaba cancelado previamente)
+    if (EST_PED_ONL === "CANCELADO" && previousEstado !== "CANCELADO") {
+      updateFields.EST_PAG_PED = "FALLIDO";
 
-    // Si el pedido se confirma o paga, y tiene factura asociada, actualizar estado de la factura a PAGADA
+      // Anular factura asociada
+      const not = order.NOT_PED_ONL || "";
+      const match = not.match(/FAC-(\d+)/);
+      if (match && match[1]) {
+        const numFac = parseInt(match[1], 10);
+        await FACTURAS.update({ EST_FAC: "ANULADA" }, { where: { NUM_FAC: numFac } });
+      }
+
+      // Reingresar stock disponible y ajustar stock reservado
+      const items = await DET_PED_ONL.findAll({ where: { ID_PED_ONL: order.ID_PED_ONL } });
+      for (const it of items) {
+        const stock = await STOCK.findByPk(it.ID_PRO);
+        if (stock) {
+          const newDisp = Number(stock.CAN_DIS_STO) + Number(it.CAN_PED_ONL);
+          const newRes = Math.max(0, Number(stock.CAN_RES_STO) - Number(it.CAN_PED_ONL));
+          await stock.update({
+            CAN_DIS_STO: newDisp,
+            CAN_RES_STO: newRes,
+            FEC_ACT_STO: new Date(),
+          });
+        }
+
+        // Registrar movimiento de Kardex (ENTRADA por cancelación)
+        await MOV_INV.create({
+          ID_PRO: it.ID_PRO,
+          TIP_MOV: "ENTRADA",
+          CAN_MOV: it.CAN_PED_ONL,
+          MOT_MOV: `Cancelación de pedido online ${order.NUM_PED_ONL} - Reingreso de stock`,
+          NUM_DOC_MOV: order.NUM_PED_ONL,
+          FEC_MOV: new Date(),
+        });
+      }
+    }
+
+    // 2. Si el pedido se confirma o paga, y tiene factura asociada, actualizar estado de la factura a PAGADA
     if (EST_PED_ONL === "CONFIRMADO" || EST_PED_ONL === "ENTREGADO" || EST_PAG_PED === "PAGADO") {
       const not = order.NOT_PED_ONL || "";
       const match = not.match(/FAC-(\d+)/);
@@ -348,6 +385,8 @@ export async function patchEstado(req, res) {
         await FACTURAS.update({ EST_FAC: "PAGADA" }, { where: { NUM_FAC: numFac } });
       }
     }
+
+    await order.update(updateFields);
 
     const refreshed = await PED_ONL.findByPk(id, {
       include: [

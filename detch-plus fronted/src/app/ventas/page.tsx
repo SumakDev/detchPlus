@@ -127,6 +127,23 @@ export default function VentasPage() {
     }
   }
 
+  async function handleFacturaStatusChange(numFac: number, newStatus: string) {
+    try {
+      const res = await fetch(`${API}/ventas/${numFac}/estado`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({ EST_FAC: newStatus }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || "No se pudo actualizar el estado de la factura");
+      }
+      await loadData();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  }
+
   async function handleCreateVenta(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedClient || !selectedProduct || cantidad <= 0 || precioUni <= 0) {
@@ -269,12 +286,13 @@ export default function VentasPage() {
                   <th className="p-3">IVA (15%)</th>
                   <th className="p-3">Total</th>
                   <th className="p-3">Estado</th>
+                  <th className="p-3 text-right">Acción</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {ventas.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-6 text-center text-gray-500">
+                    <td colSpan={8} className="p-6 text-center text-gray-500">
                       No hay facturas registradas aún.
                     </td>
                   </tr>
@@ -304,6 +322,17 @@ export default function VentasPage() {
                         >
                           {v.EST_FAC}
                         </span>
+                      </td>
+                      <td className="p-3 text-right">
+                        <select
+                          value={v.EST_FAC}
+                          onChange={(e) => handleFacturaStatusChange(v.NUM_FAC, e.target.value)}
+                          className="text-xs border rounded-md px-2 py-1 bg-white font-medium shadow-xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-gray-900"
+                        >
+                          <option value="PENDIENTE">PENDIENTE</option>
+                          <option value="PAGADA">PAGADA</option>
+                          <option value="ANULADA">ANULADA</option>
+                        </select>
                       </td>
                     </tr>
                   ))

@@ -216,3 +216,61 @@ export async function create(req, res) {
     return res.status(500).json({ error: error.message || "Error al registrar venta" });
   }
 }
+
+// PATCH /api/ventas/:id/estado
+export async function patchEstadoFactura(req, res) {
+  try {
+    const { id } = req.params;
+    const { EST_FAC } = req.body;
+    if (!["PENDIENTE", "PAGADA", "ANULADA"].includes(EST_FAC)) {
+      return res.status(400).json({ error: "Estado no válido (PENDIENTE, PAGADA, ANULADA)" });
+    }
+
+    const factura = await FACTURAS.findByPk(id);
+    if (!factura) return res.status(404).json({ error: "Factura no encontrada" });
+
+    const previousEst = factura.EST_FAC;
+    await factura.update({ EST_FAC });
+
+    // Si se anula la factura directamente
+    if (EST_FAC === "ANULADA" && previousEst !== "ANULADA") {
+      // 1. Si proviene de un pedido online, cancelar también el pedido online
+      const ped = await PED_ONL.findOne({
+        where: {
+          NOT_PED_ONL: { [Op.like]: `%FAC-${String(factura.NUM_FAC).padStart(5, "0")}%` },
+        },
+      });
+      if (ped && ped.EST_PED_ONL !== "CANCELADO") {
+        await ped.update({ EST_PED_ONL: "CANCELADO", EST_PAG_PED: "FALLIDO" });
+      }
+
+      // 2. Reingresar stock si no fue gestionado por pedido online
+      const detFac = await DET_FAC.findAll({ where: { NUM_FAC: factura.NUM_FAC } });
+      for (const it of detFac) {
+        const stock = await STOCK.findByPk(it.ID_PRO);
+        if (stock) {
+          const newDisp = Number(stock.CAN_DIS_STO) + Number(it.CAN_PRO);
+          const newRes = ped ? Math.max(0, Number(stock.CAN_RES_STO) - Number(it.CAN_PRO)) : stock.CAN_RES_STO;
+          await stock.update({
+            CAN_DIS_STO: newDisp,
+            CAN_RES_STO: newRes,
+            FEC_ACT_STO: new Date(),
+          });
+        }
+        await MOV_INV.create({
+          ID_PRO: it.ID_PRO,
+          TIP_MOV: "ENTRADA",
+          CAN_MOV: it.CAN_PRO,
+          MOT_MOV: `Anulación de factura FAC-${String(factura.NUM_FAC).padStart(5, "0")} - Reingreso de stock`,
+          NUM_DOC_MOV: `FAC-${factura.NUM_FAC}`,
+          FEC_MOV: new Date(),
+        });
+      }
+    }
+
+    return res.json(factura);
+  } catch (error) {
+    console.error("ventas.patchEstadoFactura error:", error);
+    return res.status(500).json({ error: error.message });
+  }
+}
