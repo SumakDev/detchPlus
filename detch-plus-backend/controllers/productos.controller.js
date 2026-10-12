@@ -3,7 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { Op } from "sequelize";
 import sequelize from "../config/database.js";
-import { PRODUCTOS, CATEGORIAS, MARCAS, MODELOS, STOCK } from "../models/index.js";
+import { PRODUCTOS, CATEGORIAS, MARCAS, MODELOS, STOCK, PRECIOS } from "../models/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,7 +25,16 @@ function computeNombre(row) {
 
 function toUi(row) {
   const plain = row.get ? row.get({ plain: true }) : row;
-  return { ...plain, NOMBRE: computeNombre(plain) };
+  const ventaPrice = plain.precios?.find?.(p => p.TIP_PRE === "VENTA")?.VAL_PRE;
+  const anyPrice = plain.precios?.[0]?.VAL_PRE;
+  const precio = Number(ventaPrice || anyPrice || 0);
+
+  return {
+    ...plain,
+    NOMBRE: computeNombre(plain),
+    PRECIO_VENTA: precio,
+    STOCK_DISPONIBLE: plain.stock?.CAN_DIS_STO ?? 0,
+  };
 }
 
 export async function getAll(req, res) {
@@ -41,6 +50,8 @@ export async function getAll(req, res) {
       { model: CATEGORIAS, as: "categoria", attributes: ["ID_CAT", "NOM_CAT"], required: false },
       { model: MARCAS, as: "marca", attributes: ["ID_MAR", "NOM_MAR"], required: false },
       { model: MODELOS, as: "modelo", attributes: ["ID_MOD", "NOM_MOD", "ID_MAR"], required: false },
+      { model: STOCK, as: "stock", required: false },
+      { model: PRECIOS, as: "precios", required: false },
     ];
 
     const rows = await PRODUCTOS.findAll({

@@ -49,6 +49,10 @@ MODELOS.belongsTo(MARCAS, { foreignKey: "ID_MAR", as: "marca" });
 PRODUCTOS.hasOne(STOCK, { foreignKey: "ID_PRO", as: "stock", onDelete: "CASCADE" });
 STOCK.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });
 
+// Producto -> Precios (1:N)
+PRODUCTOS.hasMany(PRECIOS, { foreignKey: "ID_PRO", as: "precios", onDelete: "CASCADE" });
+PRECIOS.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });
+
 // Movimientos -> Producto (1:N)
 PRODUCTOS.hasMany(MOV_INV, { foreignKey: "ID_PRO", as: "movimientos" });
 MOV_INV.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });
@@ -60,6 +64,10 @@ SER_TEC.belongsTo(TECNICOS, { foreignKey: "ID_TEC", as: "tecnico" });
 // SER_TEC -> CLIENTES por CED_CLI (targetKey en CLIENTES.CED_CLI)
 CLIENTES.hasMany(SER_TEC, { foreignKey: "CED_CLI", sourceKey: "CED_CLI", as: "servicios" });
 SER_TEC.belongsTo(CLIENTES, { foreignKey: "CED_CLI", targetKey: "CED_CLI", as: "cliente" });
+
+// SER_TEC -> DET_SER (1:1)
+SER_TEC.hasOne(DET_SER, { foreignKey: "NUM_SER", as: "detalle" });
+DET_SER.belongsTo(SER_TEC, { foreignKey: "NUM_SER", as: "servicio" });
 
 // Asociaciones ROLES <-> USUARIOS
 ROLES.hasMany(USUARIOS, { foreignKey: "ID_ROL", as: "usuarios" });

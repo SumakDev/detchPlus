@@ -7,6 +7,8 @@ const USUARIOS = sequelize.define("USUARIOS", {
   COR_USU: { type: DataTypes.STRING(100), allowNull: false, unique: true },
   PAS_HAS_USU: { type: DataTypes.STRING(255), allowNull: false },
   ID_ROL: { type: DataTypes.INTEGER, allowNull: false },
+  TIPO_PERSONA: { type: DataTypes.ENUM("CLIENTE", "EMPLEADO"), defaultValue: "CLIENTE" },
+  ID_PERSONA: { type: DataTypes.STRING(20), defaultValue: "" },
   NOM_USU: { type: DataTypes.STRING(100), allowNull: false },
   APE_USU: { type: DataTypes.STRING(100), allowNull: false },
   TEL_USU: DataTypes.STRING(15),

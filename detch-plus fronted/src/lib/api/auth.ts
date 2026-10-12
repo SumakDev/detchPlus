@@ -48,5 +48,64 @@ export async function registerApi(params: {
     err.status = res.status; err.details = json?.details;
     throw err;
   }
-  return json as { token?: string; user?: any };
+  return json as { token?: string; user?: any; emailPreview?: string; message?: string };
 }
+
+// Recuperar contraseña (solicitar correo)
+export async function forgotPasswordApi(email: string) {
+  const res = await fetch(`${API}/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const text = await res.text();
+  let json: any = null;
+  try { json = text ? JSON.parse(text) : null; } catch {}
+  if (!res.ok) {
+    const msg =
+      (json?.error && typeof json.error === "string" && json.error) ||
+      (json?.message && typeof json.message === "string" && json.message) ||
+      text || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return json as { message: string; emailPreview?: string };
+}
+
+// Restablecer contraseña con token
+export async function resetPasswordApi(token: string, password: string) {
+  const res = await fetch(`${API}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, password }),
+  });
+  const text = await res.text();
+  let json: any = null;
+  try { json = text ? JSON.parse(text) : null; } catch {}
+  if (!res.ok) {
+    const msg =
+      (json?.error && typeof json.error === "string" && json.error) ||
+      (json?.message && typeof json.message === "string" && json.message) ||
+      text || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return json as { message: string };
+}
+
+// Verificar correo electrónico
+export async function verifyEmailApi(token: string) {
+  const res = await fetch(`${API}/auth/verify-email?token=${encodeURIComponent(token)}`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+  const text = await res.text();
+  let json: any = null;
+  try { json = text ? JSON.parse(text) : null; } catch {}
+  if (!res.ok) {
+    const msg =
+      (json?.error && typeof json.error === "string" && json.error) ||
+      (json?.message && typeof json.message === "string" && json.message) ||
+      text || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return json as { message: string; user?: any };
+}

@@ -14,9 +14,10 @@ type LoginModalProps = {
   setOpen: (open: boolean) => void;
   onSuccess?: (data: { token?: string; user?: any }) => void;
   onOpenRegister?: () => void;
+  onOpenForgotPassword?: () => void;
 };
 
-export default function LoginModal({ open, setOpen, onOpenRegister, onSuccess }: LoginModalProps) {
+export default function LoginModal({ open, setOpen, onOpenRegister, onOpenForgotPassword, onSuccess }: LoginModalProps) {
   const router = useRouter();
   const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
@@ -67,20 +68,32 @@ export default function LoginModal({ open, setOpen, onOpenRegister, onSuccess }:
           </DialogDescription>
         </DialogHeader>
 
-        <form className="space-y-5" onSubmit={handleSubmit}>
+        <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
-            <Label htmlFor="usuario" className="font-semibold text-gray-700">Usuario</Label>
-            <Input id="usuario" type="text" placeholder="Tu usuario" className="mt-1" value={usuario} onChange={(e) => setUsuario(e.target.value)} required />
+            <Label htmlFor="usuario" className="font-semibold text-gray-700">Usuario o Correo</Label>
+            <Input id="usuario" type="text" placeholder="Tu usuario o email" className="mt-1" value={usuario} onChange={(e) => setUsuario(e.target.value)} required />
           </div>
 
           <div>
-            <Label htmlFor="password" className="font-semibold text-gray-700">Contraseña</Label>
+            <div className="flex justify-between items-center">
+              <Label htmlFor="password" className="font-semibold text-gray-700">Contraseña</Label>
+              <button
+                type="button"
+                className="text-xs text-blue-600 hover:text-blue-800 transition-colors font-medium"
+                onClick={() => {
+                  setOpen(false);
+                  onOpenForgotPassword?.();
+                }}
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
             <Input id="password" type="password" placeholder="••••••••" className="mt-1" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
 
           {errorMsg && <p className="text-sm text-red-600">{errorMsg}</p>}
 
-          <DialogFooter className="flex flex-col gap-3 items-stretch sm:flex-col">
+          <DialogFooter className="flex flex-col gap-3 items-stretch sm:flex-col pt-2">
             <Button type="submit" disabled={loading} className="w-full bg-gray-900 text-white py-3 rounded-lg font-semibold hover:bg-gray-800 transition-all duration-300 shadow-md">
               {loading ? "Ingresando..." : "Ingresar"}
             </Button>

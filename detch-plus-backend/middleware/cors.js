@@ -7,7 +7,7 @@ const origins = (process.env.WEB_ORIGIN || "http://localhost:3000")
   .map((s) => s.trim());
 
 const corsMiddleware = cors({
-  origin: process.env.WEB_ORIGIN || "http://localhost:3000",
+  origin: origins.length > 1 ? origins : (origins[0] || "http://localhost:3000"),
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization"],

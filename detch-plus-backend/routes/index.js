@@ -38,9 +38,13 @@ import authRouter from "./auth.routes.js";
 import catalogosRouter from "./catalogos.routers.js";
 import { requireAuth, denyWebUser, requireRoles } from "../middleware/auth.js";
 import servicioTecnicoRouter from "./servicio-tecnico.routes.js";
+import ventasRouter from "./ventas.routes.js";
+import reportesRouter from "./reportes.routes.js";
 
 export default function registerRoutes(app) {
-  app.use("/api/servicios-tecnicos",requireAuth(),denyWebUser(), servicioTecnicoRouter);
+  app.use("/api/servicios-tecnicos", servicioTecnicoRouter);
+  app.use("/api/ventas", ventasRouter);
+  app.use("/api/reportes", reportesRouter);
   app.use("/api/car_com", car_comRouter);
   app.use("/api/categorias", categoriasRouter);
   app.use("/api/catalogos", catalogosRouter);
@@ -69,7 +73,7 @@ export default function registerRoutes(app) {
   app.use("/api/par_pag_apl", par_pag_aplRouter);
   app.use("/api/ped_onl", ped_onlRouter);
   app.use("/api/precios", requireAuth(), denyWebUser(), preciosRouter);
-  app.use("/api/productos", requireAuth(), denyWebUser(), productosRouter);
+  app.use("/api/productos", productosRouter);
   app.use("/api/proveedores", requireAuth(), denyWebUser(), proveedoresRouter);
   app.use("/api/res_pro", requireAuth(), denyWebUser(), res_proRouter);
   app.use("/api/roles", requireAuth(), denyWebUser(), rolesRouter);

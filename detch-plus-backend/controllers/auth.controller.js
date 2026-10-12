@@ -1,7 +1,9 @@
+import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { Op } from "sequelize";
 import { USUARIOS } from "../models/index.js";
+import { sendVerificationEmail, sendPasswordResetEmail } from "../services/email.service.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1d";
@@ -42,18 +44,33 @@ export async function register(req, res) {
     if (existing) return res.status(409).json({ error: "Ya existe un usuario con ese usuario o email" });
 
     const hash = await bcrypt.hash(password, 10);
+    const verifyToken = crypto.randomBytes(32).toString("hex");
+
     const created = await USUARIOS.create({
       USR_USU: usuario,
       COR_USU: email,
       PAS_HAS_USU: hash,
       ID_ROL: DEFAULT_ROLE_ID, // fuerza rol 4
+      TIPO_PERSONA: "CLIENTE",
+      ID_PERSONA: "",
       NOM_USU: nombres,
       APE_USU: apellidos,
+      EST_USU: "ACTIVO",
+      COR_VER_USU: false,
+      TOK_VER_USU: verifyToken,
       ACE_TER_USU: !!aceptaTerminos,
     });
 
+    // Enviar correo de verificación de forma asíncrona
+    const emailResult = await sendVerificationEmail(email, nombres, verifyToken);
+
     const token = signToken(created);
-    return res.status(201).json({ token, user: toUserResponse(created) });
+    return res.status(201).json({
+      token,
+      user: toUserResponse(created),
+      message: "Registro exitoso. Se ha enviado un correo de verificación.",
+      emailPreview: emailResult.previewUrl,
+    });
   } catch (error) {
     console.error("auth.register", error);
     return res.status(500).json({ error: "Internal server error" });
@@ -110,5 +127,99 @@ export async function me(req, res) {
     return res.json({ user: req.user });
   } catch {
     return res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+// POST /api/auth/forgot-password
+export async function forgotPassword(req, res) {
+  try {
+    const { email } = req.body || {};
+    if (!email) return res.status(400).json({ error: "Debe ingresar su correo electrónico" });
+
+    const user = await USUARIOS.findOne({
+      where: { [Op.or]: [{ COR_USU: email.trim() }, { USR_USU: email.trim() }] },
+    });
+
+    // Por seguridad, si el usuario no existe no damos pistas, pero retornamos mensaje exitoso genérico
+    if (!user) {
+      return res.json({
+        message: "Si tu correo está registrado, recibirás un enlace de recuperación en los próximos minutos.",
+      });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    await user.update({
+      TOK_RES_USU: resetToken,
+      FEC_ACT_USU: new Date(),
+    });
+
+    const emailResult = await sendPasswordResetEmail(user.COR_USU, user.NOM_USU, resetToken);
+
+    return res.json({
+      message: "Si tu correo está registrado, recibirás un enlace de recuperación en los próximos minutos.",
+      emailPreview: emailResult.previewUrl,
+    });
+  } catch (error) {
+    console.error("auth.forgotPassword", error);
+    return res.status(500).json({ error: "Error al procesar la solicitud de recuperación" });
+  }
+}
+
+// POST /api/auth/reset-password
+export async function resetPassword(req, res) {
+  try {
+    const { token, password } = req.body || {};
+    if (!token || !password) {
+      return res.status(400).json({ error: "Token y nueva contraseña son obligatorios" });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
+    }
+
+    const user = await USUARIOS.findOne({ where: { TOK_RES_USU: token } });
+    if (!user) {
+      return res.status(400).json({ error: "El enlace de recuperación es inválido o ha expirado." });
+    }
+
+    const hash = await bcrypt.hash(password, 10);
+    await user.update({
+      PAS_HAS_USU: hash,
+      TOK_RES_USU: null,
+      INT_FAL_USU: 0,
+      FEC_BLOQ_USU: null,
+      FEC_ACT_USU: new Date(),
+    });
+
+    return res.json({ message: "¡Contraseña actualizada con éxito! Ya puedes iniciar sesión." });
+  } catch (error) {
+    console.error("auth.resetPassword", error);
+    return res.status(500).json({ error: "Error al restablecer la contraseña" });
+  }
+}
+
+// GET /api/auth/verify-email?token=... o POST /api/auth/verify-email
+export async function verifyEmail(req, res) {
+  try {
+    const token = req.query?.token || req.body?.token;
+    if (!token) return res.status(400).json({ error: "Token de verificación no proporcionado" });
+
+    const user = await USUARIOS.findOne({ where: { TOK_VER_USU: token } });
+    if (!user) {
+      return res.status(400).json({ error: "El token de verificación es inválido o ya fue utilizado." });
+    }
+
+    await user.update({
+      COR_VER_USU: true,
+      TOK_VER_USU: null,
+      FEC_ACT_USU: new Date(),
+    });
+
+    return res.json({
+      message: "¡Correo electrónico verificado exitosamente!",
+      user: toUserResponse(user),
+    });
+  } catch (error) {
+    console.error("auth.verifyEmail", error);
+    return res.status(500).json({ error: "Error al verificar el correo electrónico" });
   }
 }

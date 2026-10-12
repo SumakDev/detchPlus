@@ -7,6 +7,7 @@ router.get("/", tecnicosController.getAll);
 router.get("/:id", tecnicosController.getOne);
 router.post("/", tecnicosController.create);
 router.put("/:id", tecnicosController.update);
+router.patch("/:id/estado", tecnicosController.patchEstado);
 router.delete("/:id", tecnicosController.remove);
 
 export default router;

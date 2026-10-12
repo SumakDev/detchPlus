@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { User2 } from "lucide-react";
+import { User2, LayoutDashboard } from "lucide-react";
 
 type Props = {
   user: {
@@ -24,11 +24,23 @@ export default function UserMenu({ user, onLogout }: Props) {
     user.COR_USU ||
     `Usuario #${user.ID_USU}`;
 
+  const isStaff = [1, 2, 3].includes(Number(user.ID_ROL));
+
   return (
     <div className="flex items-center gap-3">
+      {isStaff && (
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-semibold transition-colors shadow-sm"
+          title="Ir al panel de administración"
+        >
+          <LayoutDashboard className="h-4 w-4" />
+          <span>Dashboard</span>
+        </Link>
+      )}
       <Link
         href="/perfil"
-        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 text-gray-800 hover:bg-gray-50"
+        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 text-gray-800 hover:bg-gray-50 text-sm"
         title="Ir a mi perfil"
       >
         <User2 className="h-4 w-4" />

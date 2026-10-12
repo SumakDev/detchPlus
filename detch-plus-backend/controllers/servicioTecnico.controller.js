@@ -1,5 +1,5 @@
 import { Op } from "sequelize";
-import { SER_TEC, TECNICOS, CLIENTES } from "../models/index.js";
+import { SER_TEC, TECNICOS, CLIENTES, DET_SER } from "../models/index.js";
 
 // Mapea el registro a una vista UI simple
 function toUi(row) {
@@ -222,3 +222,59 @@ export async function updateStatus(req, res) {
     return res.status(500).json({ error: "Internal server error" });
   }
 }
+
+// Seguimiento público de orden para clientes (por número de orden o cédula)
+export async function trackPublicService(req, res) {
+  try {
+    const query = (req.params.query || req.query.q || "").trim();
+    if (!query) {
+      return res.status(400).json({ error: "Debe ingresar un número de orden o cédula." });
+    }
+
+    const isNumeric = /^\d+$/.test(query);
+    const whereConditions = [{ CED_CLI: query }];
+    if (isNumeric) {
+      whereConditions.push({ NUM_SER: Number(query) });
+    }
+
+    const rows = await SER_TEC.findAll({
+      where: { [Op.or]: whereConditions },
+      include: [
+        { model: TECNICOS, as: "tecnico", attributes: ["NOM_TEC", "TEL_TEC"] },
+        { model: CLIENTES, as: "cliente", attributes: ["NOM_CLI", "APE_CLI", "CED_CLI"] },
+        { model: DET_SER, as: "detalle" },
+      ],
+      order: [["FEC_SER", "DESC"]],
+      limit: 5,
+    });
+
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ error: "No se encontraron órdenes de servicio técnico con ese número o cédula." });
+    }
+
+    const publicResults = rows.map((r) => {
+      const plain = r.toJSON();
+      const cli = plain.cliente || {};
+      const tec = plain.tecnico || {};
+      const det = plain.detalle || {};
+
+      return {
+        NUM_SER: plain.NUM_SER,
+        FEC_SER: plain.FEC_SER,
+        EST_SER: plain.EST_SER,
+        PRE_SER: plain.PRE_SER,
+        PRE_VEN_SER: plain.PRE_VEN_SER,
+        clienteNombre: cli.NOM_CLI ? `${cli.NOM_CLI} ${cli.APE_CLI ? cli.APE_CLI[0] + "." : ""}` : "Cliente",
+        tecnicoNombre: tec.NOM_TEC || "Técnico Asignado",
+        equipo: [det.MAR_TEL_SER, det.MOD_TEL_SER].filter(Boolean).join(" ") || det.DES_REP_TEL_SER || "Dispositivo móvil / equipo",
+        fallaReportada: det.PROB_REP_SER || "En revisión técnica",
+        solucion: det.SOL_APL_SER || (plain.EST_SER === "TERMINADO" || plain.EST_SER === "ENTREGADO" ? "Servicio concluido con éxito" : "En proceso de diagnóstico / reparación"),
+      };
+    });
+
+    return res.json(publicResults);
+  } catch (err) {
+    console.error("servicio-tecnico.trackPublicService", err);
+    return res.status(500).json({ error: "Error al consultar estado de servicio técnico" });
+  }
+}
