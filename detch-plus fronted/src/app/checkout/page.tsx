@@ -12,6 +12,33 @@ import { Label } from "@/components/ui/label";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
+export const ECUADOR_LOCATIONS: Record<string, string[]> = {
+  "Azuay": ["Cuenca", "Gualaceo", "Paute", "Santa Isabel", "Camilo Ponce Enríquez", "Chordeleg", "Girón", "Sígsig", "San Fernando", "Nabón", "Oña", "Pucará", "El Pan", "Sevilla de Oro", "Guachapala"],
+  "Bolívar": ["Guaranda", "San Miguel", "Chimbo", "Caluma", "Echeandía", "Chillanes", "Las Naves"],
+  "Cañar": ["Azogues", "La Troncal", "Cañar", "Biblián", "Déleg", "El Tambo", "Suscal"],
+  "Carchi": ["Tulcán", "San Gabriel (Montúfar)", "Mira", "Bolívar", "Espejo", "Huaca"],
+  "Chimborazo": ["Riobamba", "Guano", "Alausí", "Colta", "Chambo", "Cumandá", "Guamote", "Pallatanga", "Penipe", "Chunchi"],
+  "Cotopaxi": ["Latacunga", "Salcedo", "Pujilí", "Saquisilí", "La Maná", "Sigchos", "Pangua"],
+  "El Oro": ["Machala", "Pasaje", "Santa Rosa", "Huaquillas", "Arenillas", "Piñas", "Zaruma", "Portovelo", "El Guabo", "Atahualpa", "Balsas", "Chilla", "Las Lajas", "Marcabelí"],
+  "Esmeraldas": ["Esmeraldas", "Atacames", "Quinindé", "San Lorenzo", "Muisne", "Rioverde", "Eloy Alfaro"],
+  "Galápagos": ["Puerto Baquerizo Moreno (San Cristóbal)", "Puerto Ayora (Santa Cruz)", "Puerto Villamil (Isabela)"],
+  "Guayas": ["Guayaquil", "Durán", "Samborondón", "Daule", "Milagro", "El Triunfo", "Naranjal", "Balzar", "Playas (General Villamil)", "Salitre", "Pedro Carbo", "Yaguachi", "Santa Lucía", "Palestina", "Colimes", "Bucay", "Isidro Ayora", "Lomas de Sargentillo", "Marcelino Maridueña", "Nobol", "Simón Bolívar"],
+  "Imbabura": ["Ibarra", "Otavalo", "Cotacachi", "Antonio Ante (Atuntaqui)", "Pimampiro", "Urcuquí"],
+  "Loja": ["Loja", "Catamayo", "Cariamanga (Calvas)", "Macará", "Saraguro", "Vilcabamba", "Celica", "Alamor (Puyango)", "Chaguarpamba", "Espíndola", "Gonzanamá", "Pindal", "Quilanga", "Sozoranga", "Zapotillo"],
+  "Los Ríos": ["Babahoyo", "Quevedo", "Buena Fe", "Ventanas", "Vinces", "Valencia", "Montalvo", "Mocache", "Baba", "Puebloviejo", "Urdaneta", "Palenque", "Quinsaloma"],
+  "Manabí": ["Portoviejo", "Manta", "Chone", "Montecristi", "Jipijapa", "Bahía de Caráquez (Sucre)", "El Carmen", "Calceta (Bolívar)", "Pedernales", "Tosagua", "Rocafuerte", "Santa Ana", "San Vicente", "Jama", "Jaramijó", "Paján", "Pichincha", "Puerto López", "Flavio Alfaro", "Junín", "Olmedo", "24 de Mayo"],
+  "Morona Santiago": ["Macas (Morona)", "Sucúa", "Gualaquiza", "Limón Indanza", "Palora", "Santiago de Méndez", "Logroño", "Taisha", "Tiwintza", "Huamboya", "San Juan Bosco", "Pablo Sexto"],
+  "Napo": ["Tena", "Archidona", "El Chaco", "Baeza (Quijos)", "Carlos Julio Arosemena Tola"],
+  "Orellana": ["Puerto Francisco de Orellana (El Coca)", "La Joya de los Sachas", "Loreto", "Aguarico"],
+  "Pastaza": ["Puyo (Pastaza)", "Mera", "Santa Clara", "Arajuno"],
+  "Pichincha": ["Quito", "Rumiñahui (Sangolquí)", "Cayambe", "Mejía (Machachi)", "Pedro Moncayo (Tabacundo)", "San Miguel de los Bancos", "Pedro Vicente Maldonado", "Puerto Quito"],
+  "Santa Elena": ["Santa Elena", "La Libertad", "Salinas"],
+  "Santo Domingo de los Tsáchilas": ["Santo Domingo", "La Concordia"],
+  "Sucumbíos": ["Nueva Loja (Lago Agrio)", "Shushufindi", "Cáscales", "Cuyabeno", "Gonzalo Pizarro", "Putumayo", "Sucumbíos"],
+  "Tungurahua": ["Ambato", "Baños de Agua Santa", "Pelileo", "Píllaro", "Cevallos", "Mocha", "Patate", "Quero", "Tisaleo"],
+  "Zamora Chinchipe": ["Zamora", "Yantzaza", "El Pangui", "Centinela del Cóndor", "Chinchipe", "Nangaritza", "Palanda", "Paquisha", "Yacuambi"]
+};
+
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, iva, total, clearCart } = useCart();
@@ -24,8 +51,9 @@ export default function CheckoutPage() {
   const [cedula, setCedula] = useState("");
   const [telefono, setTelefono] = useState("");
   const [direccion, setDireccion] = useState("");
-  const [ciudad, setCiudad] = useState("Quito");
   const [provincia, setProvincia] = useState("Pichincha");
+  const [ciudad, setCiudad] = useState("Quito");
+  const [ciudadPersonalizada, setCiudadPersonalizada] = useState("");
   const [referencia, setReferencia] = useState("");
   const [metodoPago, setMetodoPago] = useState<"EFECTIVO" | "TRANSFERENCIA" | "TARJ_CRED">("EFECTIVO");
   const [notas, setNotas] = useState("");
@@ -46,10 +74,39 @@ export default function CheckoutPage() {
       if (auth.user.CEDULA || auth.user.ID_PERSONA) setCedula(auth.user.CEDULA || auth.user.ID_PERSONA || "");
       if (auth.user.TEL_USU) setTelefono(auth.user.TEL_USU);
       if (auth.user.DIRECCION) setDireccion(auth.user.DIRECCION);
-      if (auth.user.CIUDAD) setCiudad(auth.user.CIUDAD);
-      if (auth.user.PROVINCIA) setProvincia(auth.user.PROVINCIA);
+
+      const userProv = auth.user.PROVINCIA || "";
+      const userCity = auth.user.CIUDAD || "";
+      if (userProv && ECUADOR_LOCATIONS[userProv]) {
+        setProvincia(userProv);
+        const cities = ECUADOR_LOCATIONS[userProv] || [];
+        if (userCity) {
+          if (cities.includes(userCity)) {
+            setCiudad(userCity);
+          } else {
+            setCiudad("OTRA");
+            setCiudadPersonalizada(userCity);
+          }
+        } else {
+          setCiudad(cities[0] || "");
+        }
+      } else if (userCity) {
+        setCiudad("OTRA");
+        setCiudadPersonalizada(userCity);
+      }
     }
   }, [auth.user]);
+
+  function handleProvinciaChange(newProv: string) {
+    setProvincia(newProv);
+    const cities = ECUADOR_LOCATIONS[newProv] || [];
+    if (cities.length > 0) {
+      setCiudad(cities[0]);
+    } else {
+      setCiudad("OTRA");
+    }
+    setCiudadPersonalizada("");
+  }
 
   async function handlePlaceOrder(e: React.FormEvent) {
     e.preventDefault();
@@ -57,6 +114,16 @@ export default function CheckoutPage() {
 
     if (items.length === 0) {
       setErrorMsg("Tu carrito está vacío. Agrega productos antes de continuar.");
+      return;
+    }
+
+    const finalCiudad = (ciudad === "OTRA" ? ciudadPersonalizada : ciudad).trim();
+    if (!provincia) {
+      setErrorMsg("Por favor selecciona tu provincia de entrega.");
+      return;
+    }
+    if (!finalCiudad) {
+      setErrorMsg("Por favor selecciona o especifica tu ciudad de entrega.");
       return;
     }
 
@@ -70,7 +137,7 @@ export default function CheckoutPage() {
         cedula,
         telefono,
         direccion: `${direccion} ${referencia ? `(Ref: ${referencia})` : ""}`.trim(),
-        ciudad,
+        ciudad: finalCiudad,
         provincia,
         metodoPago,
         notas,
@@ -308,46 +375,89 @@ export default function CheckoutPage() {
               </h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* 1. Provincia PRIMERO */}
+                <div>
+                  <Label htmlFor="provincia" className="font-semibold text-gray-800">
+                    Provincia *
+                  </Label>
+                  <select
+                    id="provincia"
+                    value={provincia}
+                    onChange={(e) => handleProvinciaChange(e.target.value)}
+                    required
+                    className="mt-1 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                  >
+                    <option value="">Selecciona tu provincia...</option>
+                    {Object.keys(ECUADOR_LOCATIONS).sort().map((prov) => (
+                      <option key={prov} value={prov}>
+                        {prov}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. Ciudad / Cantón que depende de la provincia */}
+                <div>
+                  <Label htmlFor="ciudad" className="font-semibold text-gray-800">
+                    Ciudad / Cantón *
+                  </Label>
+                  <select
+                    id="ciudad"
+                    value={ciudad}
+                    disabled={!provincia}
+                    onChange={(e) => {
+                      setCiudad(e.target.value);
+                      if (e.target.value !== "OTRA") setCiudadPersonalizada("");
+                    }}
+                    required
+                    className="mt-1 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                  >
+                    {!provincia && <option value="">Primero selecciona una provincia</option>}
+                    {provincia && (ECUADOR_LOCATIONS[provincia] || []).map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                    {provincia && <option value="OTRA">Otra ciudad / cantón...</option>}
+                  </select>
+
+                  {ciudad === "OTRA" && (
+                    <Input
+                      id="ciudadPersonalizada"
+                      value={ciudadPersonalizada}
+                      onChange={(e) => setCiudadPersonalizada(e.target.value)}
+                      placeholder="Escribe el nombre de tu cantón o parroquia *"
+                      required
+                      className="mt-2 text-sm"
+                    />
+                  )}
+                </div>
+
+                {/* 3. Dirección exacta */}
                 <div className="sm:col-span-2">
-                  <Label htmlFor="direccion">Dirección exacta (Calle y Número) *</Label>
+                  <Label htmlFor="direccion" className="font-semibold text-gray-800">
+                    Dirección exacta (Calle y Número) *
+                  </Label>
                   <Input
                     id="direccion"
                     value={direccion}
                     onChange={(e) => setDireccion(e.target.value)}
-                    placeholder="Av. Amazonas y República, Edificio Torre Azul"
+                    placeholder="Av. Cevallos y Montalvo / Calle principal y secundaria"
                     required
                     className="mt-1"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="ciudad">Ciudad *</Label>
-                  <Input
-                    id="ciudad"
-                    value={ciudad}
-                    onChange={(e) => setCiudad(e.target.value)}
-                    placeholder="Quito"
-                    required
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="provincia">Provincia *</Label>
-                  <Input
-                    id="provincia"
-                    value={provincia}
-                    onChange={(e) => setProvincia(e.target.value)}
-                    placeholder="Pichincha"
-                    required
-                    className="mt-1"
-                  />
-                </div>
+
+                {/* 4. Referencia de entrega */}
                 <div className="sm:col-span-2">
-                  <Label htmlFor="referencia">Referencia de entrega</Label>
+                  <Label htmlFor="referencia" className="font-medium text-gray-700">
+                    Referencia de entrega
+                  </Label>
                   <Input
                     id="referencia"
                     value={referencia}
                     onChange={(e) => setReferencia(e.target.value)}
-                    placeholder="Frente a la farmacia, portón negro"
+                    placeholder="Frente a la farmacia, portón negro o casa de 2 pisos"
                     className="mt-1"
                   />
                 </div>

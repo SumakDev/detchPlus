@@ -160,12 +160,14 @@ export async function create(req, res) {
 
     const impuesto = Number((subtotal * 0.15).toFixed(2)); // IVA 15% Ecuador
     const total = Number((subtotal + impuesto).toFixed(2));
-    const numPedido = `PED-${Date.now().toString().slice(-6)}`;
+    const maxOrder = await PED_ONL.max("ID_PED_ONL", { transaction: t });
+    const nextNum = (Number(maxOrder) || 0) + 1;
+    const numPedido = `PED-${new Date().getFullYear()}${String(nextNum).padStart(6, "0")}`;
     const codSeguimiento = `DP-TRACK-${Math.floor(100000 + Math.random() * 900000)}`;
 
     // 4. Crear PED_ONL
     const orderPayload = {
-      NUM_PED_ONL: body.NUM_PED_ONL || numPedido,
+      NUM_PED_ONL: numPedido,
       ID_USU: userId,
       ID_DIR_ENV_ONL: idDirEnvio,
       SUB_PED_ONL: subtotal,
