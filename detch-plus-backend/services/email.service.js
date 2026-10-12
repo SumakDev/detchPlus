@@ -1,6 +1,11 @@
 import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 const WEB_ORIGIN = process.env.WEB_ORIGIN?.split(",")[0]?.trim() || "http://localhost:3000";
+
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
 
 let transporter = null;
 
@@ -16,6 +21,9 @@ async function getTransporter() {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
     });
   } else {
     // Modo de desarrollo: genera cuenta de prueba en Ethereal
@@ -35,13 +43,28 @@ async function getTransporter() {
   return transporter;
 }
 
+// Con RESEND_API_KEY (producción) envía por API HTTPS; sin ella (local) usa nodemailer/Ethereal
+async function sendMail({ from, to, subject, html }) {
+  if (resend) {
+    const { data, error } = await resend.emails.send({ from, to, subject, html });
+    if (error) throw new Error(error.message);
+    return { messageId: data.id, previewUrl: null };
+  }
+
+  const mailer = await getTransporter();
+  const info = await mailer.sendMail({ from, to, subject, html });
+  return {
+    messageId: info.messageId,
+    previewUrl: nodemailer.getTestMessageUrl(info) || null,
+  };
+}
+
 export async function sendVerificationEmail(to, name, token) {
   try {
-    const mailer = await getTransporter();
     const verifyUrl = `${WEB_ORIGIN}/verificar-correo?token=${token}`;
 
-    const info = await mailer.sendMail({
-      from: process.env.SMTP_FROM || '"DetchPlus Support" <no-reply@detchplus.com>',
+    const { messageId, previewUrl } = await sendMail({
+      from: process.env.SMTP_FROM || '"DetchPlus Support" <no-reply@detchplus.plus>',
       to,
       subject: "Verifica tu cuenta en DetchPlus",
       html: `
@@ -66,17 +89,16 @@ export async function sendVerificationEmail(to, name, token) {
             </p>
           </div>
           <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 20px;">
-            Si no creaste una cuenta en DetchPlus, podés ignorar este correo de forma segura.
+            Si no creaste una cuenta en DetchPlus, puedes ignorar este correo de forma segura.
           </p>
         </div>
       `,
     });
 
-    const previewUrl = nodemailer.getTestMessageUrl(info);
     if (previewUrl) {
       console.log(`✉️ [Correo de Verificación] Vista previa: ${previewUrl}`);
     }
-    return { success: true, previewUrl, messageId: info.messageId };
+    return { success: true, previewUrl, messageId };
   } catch (err) {
     console.error("Error enviando correo de verificación:", err);
     return { success: false, error: err.message };
@@ -85,11 +107,10 @@ export async function sendVerificationEmail(to, name, token) {
 
 export async function sendPasswordResetEmail(to, name, token) {
   try {
-    const mailer = await getTransporter();
     const resetUrl = `${WEB_ORIGIN}/reset-password?token=${token}`;
 
-    const info = await mailer.sendMail({
-      from: process.env.SMTP_FROM || '"DetchPlus Security" <security@detchplus.com>',
+    const { messageId, previewUrl } = await sendMail({
+      from: process.env.SMTP_FROM || '"DetchPlus Security" <security@detchplus.plus>',
       to,
       subject: "Recuperación de contraseña — DetchPlus",
       html: `
@@ -104,7 +125,7 @@ export async function sendPasswordResetEmail(to, name, token) {
               Hola, <strong>${name || "Usuario"}</strong>. Recibimos una solicitud para restablecer la contraseña de tu cuenta en DetchPlus.
             </p>
             <p style="color: #4b5563; font-size: 15px; line-height: 1.5;">
-              Hacé clic en el siguiente botón para definir tu nueva contraseña. Este enlace es válido por 1 hora:
+              Haz clic en el siguiente botón para definir tu nueva contraseña. Este enlace es válido por 1 hora:
             </p>
             <div style="text-align: center; margin: 30px 0;">
               <a href="${resetUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block;">
@@ -112,22 +133,21 @@ export async function sendPasswordResetEmail(to, name, token) {
               </a>
             </div>
             <p style="color: #6b7280; font-size: 13px; line-height: 1.4;">
-              Si el botón no abre automáticamente, ingresá a:<br>
+              Si el botón no abre automáticamente, ingresa a:<br>
               <a href="${resetUrl}" style="color: #2563eb; word-break: break-all;">${resetUrl}</a>
             </p>
           </div>
           <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 20px;">
-            Si vos no solicitaste este cambio, no te preocupes: tu cuenta sigue segura y no se realizarán modificaciones sin este enlace.
+            Si tú no solicitaste este cambio, no te preocupes: tu cuenta sigue segura y no se realizarán modificaciones sin este enlace.
           </p>
         </div>
       `,
     });
 
-    const previewUrl = nodemailer.getTestMessageUrl(info);
     if (previewUrl) {
       console.log(`🔑 [Recuperación de Contraseña] Vista previa: ${previewUrl}`);
     }
-    return { success: true, previewUrl, messageId: info.messageId };
+    return { success: true, previewUrl, messageId };
   } catch (err) {
     console.error("Error enviando correo de recuperación:", err);
     return { success: false, error: err.message };
