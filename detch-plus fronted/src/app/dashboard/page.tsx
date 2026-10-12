@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import Layout from "@/components/Layout";
+import { ShoppingCart, Store, User } from "lucide-react";
 import KpiCard from "@/components/dashboard/KpiCard";
 import RecentClients from "@/components/dashboard/RecentClients";
 import QuickActions from "@/components/dashboard/QuickActions";
@@ -127,27 +129,34 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="mx-auto max-w-7xl p-4 md:p-6 space-y-6">
-      {/* Encabezado */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-            {userName ? `Hola, ${userName} 👋` : "Dashboard"}
-          </h1>
-          <p className="text-gray-600">Resumen general, ventas, stock y reportes</p>
+    <Layout>
+      <div className="space-y-6">
+        {/* Encabezado */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+              {userName ? `Hola, ${userName} 👋` : "Dashboard"}
+            </h1>
+            <p className="text-gray-600">Resumen general de operaciones, ventas, inventario y métricas</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link href="/ventas">
+              <Button className="bg-gray-900 hover:bg-gray-800 flex items-center gap-1.5 shadow-sm">
+                <ShoppingCart className="w-4 h-4" /> Nueva Venta
+              </Button>
+            </Link>
+            <Link href="/" target="_blank">
+              <Button variant="outline" className="flex items-center gap-1.5">
+                <Store className="w-4 h-4" /> Tienda Online
+              </Button>
+            </Link>
+            <Link href="/perfil">
+              <Button variant="outline" className="flex items-center gap-1.5">
+                <User className="w-4 h-4" /> Mi Perfil
+              </Button>
+            </Link>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Link href="/perfil">
-            <Button variant="outline">Mi perfil</Button>
-          </Link>
-          <Link href="/clientes">
-            <Button className="bg-gray-900 hover:bg-gray-800">Ir a Clientes</Button>
-          </Link>
-          <Button variant="outline" onClick={logout}>
-            Cerrar sesión
-          </Button>
-        </div>
-      </div>
 
       {/* KPIs principales */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -221,6 +230,7 @@ export default function DashboardPage() {
 
       {/* Reportes */}
       <ReportsPanel data={reportes} error={errorReportes} loading={loading} />
-    </main>
-  );
+    </div>
+  </Layout>
+);
 }

@@ -21,6 +21,7 @@ import {
   UserCog,
   Users2,
   UserSquare,
+  Store,
 } from "lucide-react";
 
 interface LayoutProps {
@@ -46,12 +47,6 @@ export default function Layout({ children }: LayoutProps) {
     { name: "Técnicos", href: "/tecnicos", icon: UserCog },
     { name: "Usuarios", href: "/usuarios", icon: UserSquare },
   ];
-
-  const navigationAdmin = [
-
-
-  ];
-
 
 
   // Derivar estilos desde accesibilidad
@@ -97,8 +92,20 @@ export default function Layout({ children }: LayoutProps) {
   );
 
   const pageTitle = useMemo(() => {
-    const last = pathname.split("/").filter(Boolean).pop() || "dashboard";
-    return last.charAt(0).toUpperCase() + last.slice(1);
+    const titles: Record<string, string> = {
+      dashboard: "Dashboard Principal",
+      stock: "Control de Inventario",
+      ventas: "Punto de Venta",
+      clientes: "Gestión de Clientes",
+      reportes: "Métricas & Reportes",
+      productos: "Catálogo de Productos",
+      "servicio-tecnico": "Servicio Técnico & Taller",
+      tecnicos: "Equipo Técnico",
+      usuarios: "Control de Usuarios & Roles",
+      perfil: "Mi Perfil",
+    };
+    const key = pathname.split("/").filter(Boolean).pop() || "dashboard";
+    return titles[key] || key.charAt(0).toUpperCase() + key.slice(1);
   }, [pathname]);
 
   useEffect(() => {
@@ -164,6 +171,16 @@ export default function Layout({ children }: LayoutProps) {
               </Link>
             );
           })}
+
+          <div className="pt-3 mt-3 border-t border-gray-200/80">
+            <Link
+              href="/"
+              className={`group flex items-center gap-3 rounded-md px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 ${motionClass}`}
+            >
+              <Store className="h-5 w-5 text-gray-500 group-hover:text-blue-600 flex-shrink-0" />
+              <span className="text-sm font-medium">Ver Tienda Online</span>
+            </Link>
+          </div>
         </nav>
 
         {/* Accesibilidad (compacto y claro) */}
