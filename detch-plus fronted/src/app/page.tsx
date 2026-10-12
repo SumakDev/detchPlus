@@ -14,8 +14,10 @@ import { useCart } from "@/context/CartContext";
 import UserMenu from "@/components/auth/UserMenu";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { resolveProductImage } from "@/lib/utils";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
+
 
 const INITIAL_MOCK_PRODUCTS = [
   {
@@ -146,7 +148,7 @@ export default function Home() {
               badgeColor: "bg-blue-600",
               status: stock > 0 ? `En stock (${stock})` : "Bajo pedido",
               statusColor: stock > 0 ? "text-green-600" : "text-amber-600",
-              image: p.IMG_URL ? (p.IMG_URL.startsWith("http") ? p.IMG_URL : `/uploads/${p.IMG_URL}`) : "/images/iphone15.jpg",
+              image: resolveProductImage(p.IMG_URL),
               features: [
                 p.categoria?.NOM_CAT ? `Categoría: ${p.categoria.NOM_CAT}` : "Categoría General",
                 p.marca?.NOM_MAR ? `Marca: ${p.marca.NOM_MAR}` : "Marca Original",
@@ -396,12 +398,16 @@ export default function Home() {
                   <div>
                     {/* Imagen del producto */}
                     <div className="relative bg-gray-50/70 h-72 flex items-center justify-center overflow-hidden p-6">
-                      <Image
-                        src={product.image}
+                      <img
+                        src={resolveProductImage(product.image)}
                         alt={product.name}
-                        width={240}
-                        height={280}
-                        className="object-contain max-h-full group-hover:scale-105 transition-transform duration-300"
+                        className="object-contain max-h-full max-w-full group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          const target = e.currentTarget as HTMLImageElement;
+                          if (!target.src.endsWith("/images/iphone15.jpg")) {
+                            target.src = "/images/iphone15.jpg";
+                          }
+                        }}
                       />
 
                       {/* Badges */}

@@ -2,11 +2,12 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
-turbopack: {
+  turbopack: {
     root: path.resolve(__dirname), // define esta carpeta como raíz del proyecto Next.js
-    
   },
-  
+  images: {
+    unoptimized: true,
+  },
 };
 
 export default nextConfig;
