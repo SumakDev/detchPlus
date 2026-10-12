@@ -27,7 +27,7 @@ services:
       - key: DB_CONNECTION
         value: mysql
       - key: WEB_ORIGIN
-        value: https://detch-plus-frontend-XXX.onrender.com
+        value: https://detchplus.plus,https://www.detchplus.plus
 
   - type: web
     name: detch-plus-frontend

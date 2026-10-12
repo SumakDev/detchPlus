@@ -285,7 +285,7 @@ export default function Home() {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-6">
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200/60 rounded-full text-blue-700 text-xs font-semibold">
-                <Sparkles className="w-3.5 h-3.5" /> Nueva Colección 2024 & Servicio Autorizado
+                <Sparkles className="w-3.5 h-3.5" /> Nueva Colección 2026 & Servicio Autorizado
               </div>
 
               <h1 className="text-5xl lg:text-6xl font-extrabold text-gray-900 leading-tight tracking-tight">
@@ -353,11 +353,10 @@ export default function Home() {
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold tracking-wider transition ${
-                    selectedCategory === cat
+                  className={`px-4 py-2 rounded-xl text-xs font-semibold tracking-wider transition ${selectedCategory === cat
                       ? "bg-gray-900 text-white shadow-sm"
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
+                    }`}
                 >
                   {cat}
                 </button>

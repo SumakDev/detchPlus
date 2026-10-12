@@ -28,10 +28,20 @@ export default function SalesSummary({
           <div className="rounded-lg border p-4">
             <p className="text-sm text-gray-600">Total del día</p>
             <p className="text-2xl font-semibold text-green-600">{loading ? "…" : data?.totalHoyFmt ?? "—"}</p>
+            {data && (
+              <p className="text-[11px] text-gray-500 mt-1">
+                Mostrador: ${(data.facturasHoyTotal ?? 0).toFixed(2)} | Online: ${(data.pedidosOnlineHoyTotal ?? 0).toFixed(2)}
+              </p>
+            )}
           </div>
           <div className="rounded-lg border p-4">
-            <p className="text-sm text-gray-600">Tickets</p>
+            <p className="text-sm text-gray-600">Tickets / Pedidos</p>
             <p className="text-2xl font-semibold text-blue-600">{loading ? "…" : data?.ticketsHoy ?? "—"}</p>
+            {data && (
+              <p className="text-[11px] text-gray-500 mt-1">
+                {data.totalPedidosOnline ?? 0} pedidos web registrados
+              </p>
+            )}
           </div>
           <div className="rounded-lg border p-4">
             <p className="text-sm text-gray-600">Promedio ticket</p>

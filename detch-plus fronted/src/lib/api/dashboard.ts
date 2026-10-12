@@ -15,6 +15,9 @@ export type VentasResumen = {
   ticketsHoy: number;
   promedioTicket: number;
   crecimientoVsAyerPct: number;
+  facturasHoyTotal?: number;
+  pedidosOnlineHoyTotal?: number;
+  totalPedidosOnline?: number;
 };
 
 export type StockResumen = {
@@ -100,6 +103,9 @@ export async function fetchVentasResumen(): Promise<VentasResumen> {
       ticketsHoy: Number(json.ticketsHoy ?? 0),
       promedioTicket: Number(json.promedioTicket ?? 0),
       crecimientoVsAyerPct: Number(json.crecimientoVsAyerPct ?? 0),
+      facturasHoyTotal: Number(json.facturasHoyTotal ?? 0),
+      pedidosOnlineHoyTotal: Number(json.pedidosOnlineHoyTotal ?? 0),
+      totalPedidosOnline: Number(json.totalPedidosOnline ?? 0),
     };
   } catch {
     // Fallback si no tienes aún el endpoint
@@ -110,6 +116,9 @@ export async function fetchVentasResumen(): Promise<VentasResumen> {
       ticketsHoy: 0,
       promedioTicket: 0,
       crecimientoVsAyerPct: 0,
+      facturasHoyTotal: 0,
+      pedidosOnlineHoyTotal: 0,
+      totalPedidosOnline: 0,
     };
   }
 }

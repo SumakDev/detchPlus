@@ -73,6 +73,32 @@ DET_SER.belongsTo(SER_TEC, { foreignKey: "NUM_SER", as: "servicio" });
 ROLES.hasMany(USUARIOS, { foreignKey: "ID_ROL", as: "usuarios" });
 USUARIOS.belongsTo(ROLES, { foreignKey: "ID_ROL", as: "rol" });
 
+// Facturación y Ventas
+FACTURAS.belongsTo(CLIENTES, { foreignKey: "CED_CLI", targetKey: "CED_CLI", as: "cliente" });
+CLIENTES.hasMany(FACTURAS, { foreignKey: "CED_CLI", sourceKey: "CED_CLI", as: "facturas" });
+
+FACTURAS.belongsTo(EMPLEADOS, { foreignKey: "CED_EMP", targetKey: "CED_EMP", as: "empleado" });
+EMPLEADOS.hasMany(FACTURAS, { foreignKey: "CED_EMP", sourceKey: "CED_EMP", as: "facturas" });
+
+FACTURAS.hasMany(DET_FAC, { foreignKey: "NUM_FAC", as: "detalles", onDelete: "CASCADE" });
+DET_FAC.belongsTo(FACTURAS, { foreignKey: "NUM_FAC", as: "factura" });
+
+DET_FAC.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });
+PRODUCTOS.hasMany(DET_FAC, { foreignKey: "ID_PRO", as: "detallesFactura" });
+
+// Pedidos Online (E-Commerce)
+PED_ONL.belongsTo(USUARIOS, { foreignKey: "ID_USU", as: "usuario" });
+USUARIOS.hasMany(PED_ONL, { foreignKey: "ID_USU", as: "pedidos" });
+
+PED_ONL.belongsTo(DIR_USU, { foreignKey: "ID_DIR_ENV_ONL", as: "direccionEnvio" });
+
+PED_ONL.hasMany(DET_PED_ONL, { foreignKey: "ID_PED_ONL", as: "detalles", onDelete: "CASCADE" });
+PED_ONL.hasMany(DET_PED_ONL, { foreignKey: "ID_PED_ONL", as: "items", onDelete: "CASCADE" });
+DET_PED_ONL.belongsTo(PED_ONL, { foreignKey: "ID_PED_ONL", as: "pedido" });
+
+DET_PED_ONL.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });
+PRODUCTOS.hasMany(DET_PED_ONL, { foreignKey: "ID_PRO", as: "detallesPedido" });
+
 export {
   CATEGORIAS,
   MARCAS,

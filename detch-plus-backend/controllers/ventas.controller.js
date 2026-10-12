@@ -1,6 +1,6 @@
 import { Op } from "sequelize";
 import sequelize from "../config/database.js";
-import { FACTURAS, DET_FAC, CLIENTES, EMPLEADOS, PRODUCTOS, STOCK, MOV_INV } from "../models/index.js";
+import { FACTURAS, DET_FAC, CLIENTES, EMPLEADOS, PRODUCTOS, STOCK, MOV_INV, PED_ONL } from "../models/index.js";
 
 // GET /api/ventas/resumen
 export async function getResumen(req, res) {
@@ -35,10 +35,35 @@ export async function getResumen(req, res) {
       },
     });
 
-    const totalHoy = facturasHoy.reduce((acc, f) => acc + Number(f.TOT_FAC || 0), 0);
+    // Consultar pedidos online para métricas globales
+    const pedidosHoy = await PED_ONL.findAll({
+      where: {
+        FEC_PED_ONL: { [Op.between]: [startOfToday, endOfToday] },
+        EST_PED_ONL: { [Op.ne]: "CANCELADO" },
+      },
+    });
+
+    const pedidosMes = await PED_ONL.findAll({
+      where: {
+        FEC_PED_ONL: { [Op.gte]: startOfMonth },
+        EST_PED_ONL: { [Op.ne]: "CANCELADO" },
+      },
+    });
+
+    // Evitar doble conteo si el pedido online ya generó factura registrada
+    const pedidosSinFacturaHoy = pedidosHoy.filter((p) => !p.NOT_PED_ONL || !p.NOT_PED_ONL.includes("FAC-"));
+    const pedidosSinFacturaMes = pedidosMes.filter((p) => !p.NOT_PED_ONL || !p.NOT_PED_ONL.includes("FAC-"));
+
+    const totalFacturasHoy = facturasHoy.reduce((acc, f) => acc + Number(f.TOT_FAC || 0), 0);
+    const totalPedidosOnlineHoy = pedidosSinFacturaHoy.reduce((acc, p) => acc + Number(p.TOT_PED_ONL || 0), 0);
+    const totalHoy = totalFacturasHoy + totalPedidosOnlineHoy;
+
     const totalAyer = facturasAyer.reduce((acc, f) => acc + Number(f.TOT_FAC || 0), 0);
-    const totalMes = facturasMes.reduce((acc, f) => acc + Number(f.TOT_FAC || 0), 0);
-    const ticketsHoy = facturasHoy.length;
+    const totalMes =
+      facturasMes.reduce((acc, f) => acc + Number(f.TOT_FAC || 0), 0) +
+      pedidosSinFacturaMes.reduce((acc, p) => acc + Number(p.TOT_PED_ONL || 0), 0);
+
+    const ticketsHoy = facturasHoy.length + pedidosSinFacturaHoy.length;
     const promedioTicket = ticketsHoy > 0 ? totalHoy / ticketsHoy : 0;
 
     let crecimientoVsAyerPct = 0;
@@ -55,6 +80,9 @@ export async function getResumen(req, res) {
       ticketsHoy,
       promedioTicket,
       crecimientoVsAyerPct,
+      facturasHoyTotal: totalFacturasHoy,
+      pedidosOnlineHoyTotal: totalPedidosOnlineHoy,
+      totalPedidosOnline: pedidosHoy.length,
     });
   } catch (error) {
     console.error("ventas.getResumen error:", error);
@@ -72,14 +100,27 @@ export async function getAll(req, res) {
     const data = await FACTURAS.findAll({
       where,
       include: [
-        { model: CLIENTES, foreignKey: "CED_CLI", as: "cliente", attributes: ["CED_CLI", "NOM_CLI", "APE_CLI", "NUM_CLI"] },
-        { model: DET_FAC, foreignKey: "NUM_FAC", as: "detalles", include: [{ model: PRODUCTOS, foreignKey: "ID_PRO", as: "producto", attributes: ["ID_PRO", "DES_PRO", "COD_BAR_PRO"] }] },
+        {
+          model: CLIENTES,
+          as: "cliente",
+          attributes: ["CED_CLI", "NOM_CLI", "APE_CLI", "NUM_CLI", "COR_CLI"],
+        },
+        {
+          model: DET_FAC,
+          as: "detalles",
+          include: [
+            {
+              model: PRODUCTOS,
+              as: "producto",
+              attributes: ["ID_PRO", "DES_PRO", "COD_BAR_PRO", "IMG_URL"],
+            },
+          ],
+        },
       ],
       order: [["FEC_FAC", "DESC"]],
     });
     return res.json(data);
   } catch (error) {
-    // Si no están asociadas las relaciones en index.js, fallback simple
     try {
       const simple = await FACTURAS.findAll({ order: [["FEC_FAC", "DESC"]] });
       return res.json(simple);
@@ -99,6 +140,13 @@ export async function create(req, res) {
     if (!CED_CLI) return res.status(400).json({ error: "Cédula de cliente requerida" });
     if (!items.length) return res.status(400).json({ error: "Debe incluir al menos un producto" });
 
+    // Resolver empleado válido
+    let cedulaEmpleado = CED_EMP;
+    if (!cedulaEmpleado) {
+      const emp = await EMPLEADOS.findOne({ transaction: t });
+      cedulaEmpleado = emp ? emp.CED_EMP : "1234567890";
+    }
+
     let subtotal = 0;
     for (const item of items) {
       const precio = Number(item.PRE_UNI_FAC || item.precio || 0);
@@ -112,7 +160,7 @@ export async function create(req, res) {
     const factura = await FACTURAS.create(
       {
         CED_CLI,
-        CED_EMP: CED_EMP || "0000000000",
+        CED_EMP: cedulaEmpleado,
         DIR_FAC: DIR_FAC || "Venta en mostrador",
         SUB_FAC: subtotal,
         IVA_FAC: iva,
