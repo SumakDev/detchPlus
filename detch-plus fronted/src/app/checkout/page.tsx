@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/hooks/useAuth";
-import { Apple, ShoppingBag, ArrowLeft, CheckCircle2, ShieldCheck, Truck, CreditCard, Banknote, Building2 } from "lucide-react";
+import { Apple, ShoppingBag, ArrowLeft, CheckCircle2, ShieldCheck, Truck, CreditCard, Banknote, Building2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,10 +16,11 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, iva, total, clearCart } = useCart();
   const auth = useAuth();
+  const isLoggedIn = !!auth.user;
 
   // Form states
-  const [nombres, setNombres] = useState(auth.user?.NOM_USU ? `${auth.user.NOM_USU} ${auth.user.APE_USU || ""}`.trim() : "");
-  const [email, setEmail] = useState(auth.user?.EMAIL || auth.user?.COR_USU || "");
+  const [nombres, setNombres] = useState("");
+  const [email, setEmail] = useState("");
   const [cedula, setCedula] = useState("");
   const [telefono, setTelefono] = useState("");
   const [direccion, setDireccion] = useState("");
@@ -32,6 +33,23 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [completedOrder, setCompletedOrder] = useState<any | null>(null);
+
+  // Auto-llenado de datos cuando el usuario está logueado
+  useEffect(() => {
+    if (auth.user) {
+      const fullName = [auth.user.NOM_USU, auth.user.APE_USU].filter(Boolean).join(" ").trim() ||
+        auth.user.USUARIO ||
+        auth.user.USR_USU ||
+        "";
+      if (fullName) setNombres(fullName);
+      if (auth.user.EMAIL || auth.user.COR_USU) setEmail(auth.user.EMAIL || auth.user.COR_USU || "");
+      if (auth.user.CEDULA || auth.user.ID_PERSONA) setCedula(auth.user.CEDULA || auth.user.ID_PERSONA || "");
+      if (auth.user.TEL_USU) setTelefono(auth.user.TEL_USU);
+      if (auth.user.DIRECCION) setDireccion(auth.user.DIRECCION);
+      if (auth.user.CIUDAD) setCiudad(auth.user.CIUDAD);
+      if (auth.user.PROVINCIA) setProvincia(auth.user.PROVINCIA);
+    }
+  }, [auth.user]);
 
   async function handlePlaceOrder(e: React.FormEvent) {
     e.preventDefault();
@@ -201,25 +219,40 @@ export default function CheckoutPage() {
           <div className="lg:col-span-7 space-y-8">
             {/* Step 1: Información de contacto */}
             <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <span className="w-6 h-6 bg-gray-900 text-white rounded-full flex items-center justify-center text-xs">1</span>
-                Datos del Comprador
-              </h2>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <span className="w-6 h-6 bg-gray-900 text-white rounded-full flex items-center justify-center text-xs">1</span>
+                  Datos del Comprador
+                </h2>
+                {isLoggedIn && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full text-xs font-semibold">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    Datos bloqueados por tu cuenta ({auth.user?.USR_USU || auth.user?.EMAIL})
+                  </span>
+                )}
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="nombres">Nombres y Apellidos *</Label>
+                  <Label htmlFor="nombres" className="flex items-center justify-between">
+                    <span>Nombres y Apellidos *</span>
+                    {isLoggedIn && <Lock className="w-3.5 h-3.5 text-gray-400" />}
+                  </Label>
                   <Input
                     id="nombres"
                     value={nombres}
                     onChange={(e) => setNombres(e.target.value)}
                     placeholder="Ej. Jonathan Boada"
                     required
-                    className="mt-1"
+                    readOnly={isLoggedIn}
+                    className={`mt-1 transition ${isLoggedIn ? "bg-gray-100 text-gray-700 font-medium cursor-not-allowed border-gray-200 select-none" : ""}`}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="email">Correo Electrónico *</Label>
+                  <Label htmlFor="email" className="flex items-center justify-between">
+                    <span>Correo Electrónico *</span>
+                    {isLoggedIn && <Lock className="w-3.5 h-3.5 text-gray-400" />}
+                  </Label>
                   <Input
                     id="email"
                     type="email"
@@ -227,29 +260,41 @@ export default function CheckoutPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="ejemplo@correo.com"
                     required
-                    className="mt-1"
+                    readOnly={isLoggedIn}
+                    className={`mt-1 transition ${isLoggedIn ? "bg-gray-100 text-gray-700 font-medium cursor-not-allowed border-gray-200 select-none" : ""}`}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="cedula">Cédula o RUC *</Label>
+                  <Label htmlFor="cedula" className="flex items-center justify-between">
+                    <span>Cédula o RUC *</span>
+                    {isLoggedIn && !!cedula && <Lock className="w-3.5 h-3.5 text-gray-400" />}
+                  </Label>
                   <Input
                     id="cedula"
                     value={cedula}
                     onChange={(e) => setCedula(e.target.value)}
                     placeholder="10 dígitos"
                     required
-                    className="mt-1"
+                    readOnly={isLoggedIn && !!auth.user?.CEDULA}
+                    className={`mt-1 transition ${isLoggedIn && !!auth.user?.CEDULA ? "bg-gray-100 text-gray-700 font-medium cursor-not-allowed border-gray-200 select-none" : ""}`}
                   />
+                  {isLoggedIn && !auth.user?.CEDULA && (
+                    <p className="text-[11px] text-amber-600 mt-1">Ingresa tu cédula para tu factura fiscal.</p>
+                  )}
                 </div>
                 <div>
-                  <Label htmlFor="telefono">Teléfono / WhatsApp *</Label>
+                  <Label htmlFor="telefono" className="flex items-center justify-between">
+                    <span>Teléfono / WhatsApp *</span>
+                    {isLoggedIn && !!telefono && <Lock className="w-3.5 h-3.5 text-gray-400" />}
+                  </Label>
                   <Input
                     id="telefono"
                     value={telefono}
                     onChange={(e) => setTelefono(e.target.value)}
                     placeholder="0991234567"
                     required
-                    className="mt-1"
+                    readOnly={isLoggedIn && !!auth.user?.TEL_USU}
+                    className={`mt-1 transition ${isLoggedIn && !!auth.user?.TEL_USU ? "bg-gray-100 text-gray-700 font-medium cursor-not-allowed border-gray-200 select-none" : ""}`}
                   />
                 </div>
               </div>

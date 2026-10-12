@@ -9,13 +9,19 @@ function getAuthHeaders(): Record<string, string> {
 export type MeUser = {
   ID_USU: number;
   ID_ROL: number;
-  USR_USU?: string; // USR_USU
-  COR_USU?: string; // COR_USU
+  USR_USU?: string;
+  COR_USU?: string;
   NOM_USU?: string;
   APE_USU?: string;
   AVA_USU?: string | null;
   EMAIL?: string;
   USUARIO?: string;
+  TEL_USU?: string;
+  CEDULA?: string;
+  ID_PERSONA?: string;
+  DIRECCION?: string;
+  CIUDAD?: string;
+  PROVINCIA?: string;
 };
 
 export async function getMe(): Promise<{ user: MeUser }> {
