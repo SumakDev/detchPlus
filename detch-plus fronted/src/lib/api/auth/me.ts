@@ -14,6 +14,8 @@ export type MeUser = {
   NOM_USU?: string;
   APE_USU?: string;
   AVA_USU?: string | null;
+  EMAIL?: string;
+  USUARIO?: string;
 };
 
 export async function getMe(): Promise<{ user: MeUser }> {
