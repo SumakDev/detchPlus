@@ -183,9 +183,17 @@ export default function VentasPage() {
     }
   }
 
-  const totalFacturado = ventas.reduce((acc, v) => acc + Number(v.TOT_FAC || 0), 0);
-  const totalOnline = pedidos.reduce((acc, p) => acc + Number(p.TOT_PED_ONL || 0), 0);
-  const totalGlobal = totalFacturado > 0 ? totalFacturado : totalOnline;
+  // Excluir facturas ANULADAS y pedidos CANCELADOS de los totales
+  const ventasActivas = ventas.filter((v) => v.EST_FAC !== "ANULADA");
+  const pedidosActivos = pedidos.filter((p) => p.EST_PED_ONL !== "CANCELADO");
+
+  // Sumar total facturado neto activo (las facturas online se registran como facturas)
+  const totalFacturado = ventasActivas.reduce((acc, v) => acc + Number(v.TOT_FAC || 0), 0);
+  // Pedidos online que no tengan factura registrada aún
+  const pedidosSinFactura = pedidosActivos.filter((p) => !p.NOT_PED_ONL || !p.NOT_PED_ONL.includes("FAC-"));
+  const totalOnlineSinFactura = pedidosSinFactura.reduce((acc, p) => acc + Number(p.TOT_PED_ONL || 0), 0);
+  const totalGlobal = totalFacturado + totalOnlineSinFactura;
+
   const pedidosPendientes = pedidos.filter((p) => p.EST_PED_ONL === "PENDIENTE").length;
 
   return (
@@ -220,9 +228,11 @@ export default function VentasPage() {
           <Card>
             <CardContent className="p-4 md:p-6 flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Facturas Emitidas</p>
-                <p className="text-2xl font-bold text-gray-900">{ventas.length}</p>
-                <p className="text-xs text-gray-400 mt-0.5">${totalFacturado.toFixed(2)} en mostrador</p>
+                <p className="text-sm font-medium text-gray-500">Facturas Activas</p>
+                <p className="text-2xl font-bold text-gray-900">{ventasActivas.length}</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  ${totalFacturado.toFixed(2)} netas {ventas.length > ventasActivas.length ? `(${ventas.length - ventasActivas.length} anuladas)` : ""}
+                </p>
               </div>
               <FileText className="h-8 w-8 text-blue-600" />
             </CardContent>
@@ -231,8 +241,10 @@ export default function VentasPage() {
             <CardContent className="p-4 md:p-6 flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500">Pedidos Tienda Online</p>
-                <p className="text-2xl font-bold text-purple-600">{pedidos.length}</p>
-                <p className="text-xs text-amber-600 font-medium mt-0.5">{pedidosPendientes} pendientes de entrega</p>
+                <p className="text-2xl font-bold text-purple-600">{pedidosActivos.length}</p>
+                <p className="text-xs text-amber-600 font-medium mt-0.5">
+                  {pedidosPendientes} pendientes {pedidos.length > pedidosActivos.length ? `(${pedidos.length - pedidosActivos.length} cancelados)` : ""}
+                </p>
               </div>
               <CheckCircle2 className="h-8 w-8 text-purple-600" />
             </CardContent>
