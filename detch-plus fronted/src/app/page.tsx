@@ -3,7 +3,19 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Search, ShoppingBag, Apple, Star, Sparkles, Wrench, ArrowRight, Check } from "lucide-react";
+import {
+  ShoppingBag,
+  Apple,
+  Star,
+  Sparkles,
+  Wrench,
+  ArrowRight,
+  Check,
+  Smartphone,
+  Gamepad2,
+  ChevronRight,
+  PackageOpen,
+} from "lucide-react";
 import LoginModal from "@/components/auth/LoginModal";
 import RegisterModal from "@/components/auth/RegisterModal";
 import ForgotPasswordModal from "@/components/auth/ForgotPasswordModal";
@@ -12,95 +24,27 @@ import ServiceTrackingModal from "@/components/support/ServiceTrackingModal";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/context/CartContext";
 import UserMenu from "@/components/auth/UserMenu";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { resolveProductImage } from "@/lib/utils";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
-
-const INITIAL_MOCK_PRODUCTS = [
-  {
-    id: 1,
-    name: "iPhone 15 Pro Max",
-    subtitle: "Titanio. Tan resistente. Tan ligero. Tan Pro.",
-    price: "$1,199",
-    rawPrice: 1199,
-    originalPrice: null,
-    badge: "Nuevo",
-    badgeColor: "bg-blue-600",
-    status: "En stock",
-    statusColor: "text-green-600",
-    image: "/images/iphone-15-pro-max.png",
-    features: ["Pantalla 6.7\" Super Retina XDR", "Sistema de cámaras Pro", "Chip A17 Pro"],
-    colors: ["#8A8A8E", "#F5F5DC", "#2C2C2C", "#C9B037"],
-    category: "Pro Max",
-  },
-  {
-    id: 2,
-    name: "iPhone 15 Plus",
-    subtitle: "Pantalla grande. Batería aún más grande.",
-    price: "$899",
-    rawPrice: 899,
-    originalPrice: null,
-    badge: null,
-    badgeColor: "",
-    status: "En stock",
-    statusColor: "text-green-600",
-    image: "/images/iphone-15-plus.png",
-    features: ["Pantalla 6.7\" Super Retina XDR", "Sistema de cámaras avanzado", "Chip A16 Bionic"],
-    colors: ["#FFB6C1", "#87CEEB", "#030303ff", "#90EE90"],
-    category: "Plus",
-  },
-  {
-    id: 3,
-    name: "iPhone 15",
-    subtitle: "Nuevo. Mejorado. Extraordinario.",
-    price: "$799",
-    rawPrice: 799,
-    originalPrice: null,
-    badge: null,
-    badgeColor: "",
-    status: "Stock limitado",
-    statusColor: "text-yellow-600",
-    image: "/images/iphone15.jpg",
-    features: ["Pantalla 6.1\" Super Retina XDR", "Sistema de cámaras avanzado", "Chip A16 Bionic"],
-    colors: ["#FFB6C1", "#90EE90", "#87CEEB", "#FFC0CB"],
-    category: "Estándar",
-  },
-  {
-    id: 4,
-    name: "iPhone 14",
-    subtitle: "Tan impresionante. Tan capaz. Tan querido.",
-    price: "$599",
-    rawPrice: 599,
-    originalPrice: "$699",
-    badge: "Oferta",
-    badgeColor: "bg-red-600",
-    status: "En stock",
-    statusColor: "text-green-600",
-    image: "/images/iphone14.png",
-    features: ["Pantalla 6.1\" Super Retina XDR", "Sistema de cámaras dual", "Chip A15 Bionic"],
-    colors: ["#800080", "#87CEEB", "#2C2C2C", "#FF69B4"],
-    category: "Estándar",
-  },
-  {
-    id: 5,
-    name: "iPhone SE",
-    subtitle: "Mucha potencia. Fácil de usar. Fácil de amar.",
-    price: "$429",
-    rawPrice: 429,
-    originalPrice: null,
-    badge: "Mejor precio",
-    badgeColor: "bg-green-600",
-    status: "En stock",
-    statusColor: "text-green-600",
-    image: "/images/iphone-se.png",
-    features: ["Pantalla 4.7\" Retina HD", "Cámara de 12MP", "Chip A15 Bionic"],
-    colors: ["#2C2C2C", "#FFFFFF", "#FF0000"],
-    category: "SE",
-  },
-];
+interface PhoneProduct {
+  id: number;
+  name: string;
+  subtitle: string;
+  price: string;
+  rawPrice: number;
+  badge: string | null;
+  badgeColor: string;
+  stock: number;
+  status: string;
+  statusColor: string;
+  image: string;
+  features: string[];
+  category: string;
+  rawCategory: string;
+}
 
 export default function Home() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -108,9 +52,8 @@ export default function Home() {
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
   const [isTrackingOpen, setIsTrackingOpen] = useState(false);
 
-  const [productsList, setProductsList] = useState<any[]>(INITIAL_MOCK_PRODUCTS);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("TODOS");
+  const [latestPhones, setLatestPhones] = useState<PhoneProduct[]>([]);
+  const [loadingPhones, setLoadingPhones] = useState(true);
   const [addedItemNotice, setAddedItemNotice] = useState<string | null>(null);
 
   const auth = useAuth();
@@ -126,75 +69,86 @@ export default function Home() {
     }
   }, []);
 
-  // Cargar productos reales desde el backend
+  // Cargar teléfonos reales desde el backend (categoría TELEFONO o smartphones recientes)
   useEffect(() => {
-    async function loadDynamicProducts() {
+    async function loadLatestPhones() {
       try {
+        setLoadingPhones(true);
         const res = await fetch(`${API}/productos`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          setLoadingPhones(false);
+          return;
+        }
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const mapped = data.map((p) => {
+        if (Array.isArray(data)) {
+          // Filtrar específicamente productos que correspondan a telefonía / smartphones
+          const phonesOnly = data.filter((p) => {
+            const cat = (p.categoria?.NOM_CAT || "").toUpperCase();
+            const idCat = Number(p.ID_CAT || 0);
+            const name = (p.NOMBRE || "").toUpperCase();
+            return (
+              idCat === 1 ||
+              cat === "TELEFONO" ||
+              cat.includes("PHONE") ||
+              name.includes("IPHONE") ||
+              name.includes("GALAXY") ||
+              name.includes("XIAOMI") ||
+              name.includes("CELULAR")
+            );
+          });
+
+          const mapped: PhoneProduct[] = phonesOnly.map((p) => {
             const precioVenta = Number(p.PRECIO_VENTA || 0);
-            const stock = Number(p.STOCK_DISPONIBLE ?? 0);
+            const stock = Number(p.STOCK_DISPONIBLE ?? (p.stock?.CAN_DIS_STO ?? 0));
+            const brand = p.marca?.NOM_MAR || "Apple";
+            const model = p.modelo?.NOM_MOD || "";
+
             return {
-              id: p.ID_PRO,
-              name: p.NOMBRE || `Producto #${p.ID_PRO}`,
-              subtitle: p.DES_PRO || "Dispositivo garantizado por DetchPlus",
+              id: Number(p.ID_PRO),
+              name: p.NOMBRE || `iPhone #${p.ID_PRO}`,
+              subtitle: p.DES_PRO || "Dispositivo garantizado y verificado por DetchPlus",
               price: precioVenta > 0 ? `$${precioVenta.toFixed(2)}` : "$499.00",
               rawPrice: precioVenta > 0 ? precioVenta : 499,
-              originalPrice: null,
-              badge: p.EST_PRO === "NUEVO" ? "Nuevo" : p.EST_PRO || null,
+              badge: p.EST_PRO === "NUEVO" ? "Nuevo" : p.EST_PRO || "Garantizado",
               badgeColor: "bg-blue-600",
-              status: stock > 0 ? `En stock (${stock})` : "Bajo pedido",
-              statusColor: stock > 0 ? "text-green-600" : "text-amber-600",
+              stock,
+              status: stock > 0 ? `En stock (${stock})` : "Agotado",
+              statusColor: stock > 0 ? "text-emerald-600 bg-emerald-50 border-emerald-200" : "text-amber-600 bg-amber-50 border-amber-200",
               image: resolveProductImage(p.IMG_URL),
               features: [
-                p.categoria?.NOM_CAT ? `Categoría: ${p.categoria.NOM_CAT}` : "Categoría General",
-                p.marca?.NOM_MAR ? `Marca: ${p.marca.NOM_MAR}` : "Marca Original",
-                "Garantía oficial DetchPlus",
+                `Marca Oficial: ${brand}`,
+                model ? `Modelo: ${model}` : "Garantía oficial DetchPlus",
+                stock > 0 ? "Entrega inmediata" : "Bajo pedido",
               ],
-              colors: ["#2C2C2C", "#FFFFFF", "#8A8A8E"],
-              category: p.categoria?.NOM_CAT || "General",
+              category: p.categoria?.NOM_CAT || "Teléfono",
+              rawCategory: (p.categoria?.NOM_CAT || "TELEFONO").toUpperCase(),
             };
           });
 
-          // Combinar productos de la base de datos con los mockups para un catálogo completo
-          setProductsList([...mapped, ...INITIAL_MOCK_PRODUCTS]);
+          setLatestPhones(mapped);
         }
       } catch (err) {
-        console.error("Error cargando productos del backend:", err);
+        console.error("Error cargando teléfonos del backend:", err);
+      } finally {
+        setLoadingPhones(false);
       }
     }
-    loadDynamicProducts();
+
+    loadLatestPhones();
   }, []);
 
-  function handleAddToCart(p: any) {
+  function handleAddToCart(p: PhoneProduct) {
+    if (p.stock <= 0) return;
     cart.addToCart({
       id: p.id,
       name: p.name,
-      price: p.rawPrice || 499,
+      price: p.rawPrice,
       image: p.image,
       category: p.category,
     });
     setAddedItemNotice(p.name);
     setTimeout(() => setAddedItemNotice(null), 2500);
   }
-
-  // Filtrar productos por búsqueda y categoría
-  const filteredProducts = productsList.filter((p) => {
-    const matchesSearch =
-      searchTerm === "" ||
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.subtitle.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesCat =
-      selectedCategory === "TODOS" ||
-      p.category?.toUpperCase() === selectedCategory.toUpperCase() ||
-      (selectedCategory === "IPHONE" && p.name.toLowerCase().includes("iphone"));
-
-    return matchesSearch && matchesCat;
-  });
 
   return (
     <div className="min-h-screen bg-white">
@@ -222,8 +176,11 @@ export default function Home() {
 
             {/* Navegación central */}
             <div className="hidden md:flex items-center space-x-8">
-              <Link href="#productos" className="text-gray-600 hover:text-gray-900 font-medium transition-colors">
-                Productos
+              <Link href="/" className="text-gray-900 font-semibold transition-colors">
+                Inicio
+              </Link>
+              <Link href="/catalogo" className="text-gray-600 hover:text-gray-900 font-medium transition-colors">
+                Catálogo
               </Link>
               <button
                 onClick={() => setIsTrackingOpen(true)}
@@ -294,15 +251,15 @@ export default function Home() {
               </h1>
 
               <p className="text-lg text-gray-600 leading-relaxed max-w-xl">
-                Descubre los últimos dispositivos Apple con garantía oficial, asesoría personalizada y servicio técnico especializado de vanguardia.
+                Descubre los últimos dispositivos Apple y tecnología móvil con garantía oficial, asesoría personalizada y servicio técnico especializado.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 pt-2">
                 <Link
-                  href="#productos"
-                  className="bg-gray-900 text-white px-8 py-4 rounded-xl font-semibold hover:bg-gray-800 transition-all duration-300 hover:shadow-lg text-center"
+                  href="/catalogo"
+                  className="bg-gray-900 text-white px-8 py-4 rounded-xl font-semibold hover:bg-gray-800 transition-all duration-300 hover:shadow-lg text-center flex items-center justify-center gap-2"
                 >
-                  Explorar productos
+                  Explorar Catálogo Completo <ArrowRight className="w-4 h-4" />
                 </Link>
 
                 <button
@@ -319,7 +276,7 @@ export default function Home() {
               <div className="relative">
                 <Image
                   src="/images/iphone-hero.png"
-                  alt="iPhone 15 Pro en color titanio natural"
+                  alt="iPhone en color titanio natural"
                   width={420}
                   height={520}
                   className="mx-auto lg:ml-auto object-contain drop-shadow-2xl"
@@ -332,74 +289,72 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Catálogo de Productos */}
-      <main className="py-16" id="productos">
+      {/* Sección Dinámica: Últimos Teléfonos */}
+      <section className="py-16 bg-white" id="telefonos">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header de sección */}
-          <div className="text-center mb-12">
-            <h2 className="text-3xl lg:text-4xl font-extrabold text-gray-900 mb-3 tracking-tight">
-              Catálogo de Dispositivos & Equipos
-            </h2>
-            <p className="text-gray-600 max-w-xl mx-auto text-base">
-              Productos garantizados con disponibilidad inmediata y entrega en todo el país
-            </p>
+          {/* Header de sección con enlace al catálogo completo */}
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10 pb-4 border-b border-gray-100">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold mb-2">
+                <Smartphone className="w-3.5 h-3.5" /> Smartphones en Stock
+              </div>
+              <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight">
+                Últimos Teléfonos Disponibles
+              </h2>
+              <p className="text-gray-500 text-sm mt-1 max-w-xl">
+                Equipos móviles con stock en tiempo real, garantía oficial de DetchPlus y entrega inmediata.
+              </p>
+            </div>
+
+            <Link
+              href="/catalogo"
+              className="inline-flex items-center gap-1.5 text-sm font-bold text-blue-600 hover:text-blue-800 transition group self-start sm:self-auto"
+            >
+              Ver catálogo completo
+              <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+            </Link>
           </div>
 
-          {/* Filtros y Buscador */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-10 pb-6 border-b border-gray-100">
-            {/* Categorías tabs */}
-            <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0">
-              {["TODOS", "IPHONE", "CONSOLA", "SE", "PLUS"].map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold tracking-wider transition ${selectedCategory === cat
-                      ? "bg-gray-900 text-white shadow-sm"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
-                >
-                  {cat}
-                </button>
+          {/* Grid de Teléfonos */}
+          {loadingPhones ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="bg-gray-50 rounded-2xl p-6 animate-pulse space-y-4">
+                  <div className="bg-gray-200 h-64 rounded-xl w-full" />
+                  <div className="h-5 bg-gray-200 rounded w-2/3" />
+                  <div className="h-4 bg-gray-200 rounded w-1/2" />
+                </div>
               ))}
             </div>
-
-            {/* Input Buscador */}
-            <div className="relative w-full sm:w-72">
-              <Input
-                type="text"
-                placeholder="Buscar por nombre o modelo..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 rounded-xl border-gray-200 text-sm"
-              />
-              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-          </div>
-
-          {/* Grid de productos */}
-          {filteredProducts.length === 0 ? (
-            <div className="text-center py-16 bg-gray-50 rounded-2xl">
-              <p className="text-gray-500 text-base">No se encontraron productos que coincidan con tu búsqueda.</p>
-              <button
-                onClick={() => { setSearchTerm(""); setSelectedCategory("TODOS"); }}
-                className="mt-3 text-sm font-semibold text-blue-600 hover:underline"
+          ) : latestPhones.length === 0 ? (
+            <div className="text-center py-14 bg-gray-50 rounded-2xl border border-gray-100 p-8 max-w-lg mx-auto">
+              <PackageOpen className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <h3 className="text-base font-bold text-gray-900 mb-1">
+                No hay teléfonos en stock en este momento
+              </h3>
+              <p className="text-xs text-gray-500 mb-5">
+                Próximamente incorporaremos nuevos modelos. Puedes revisar consolas, controles y accesorios en nuestro catálogo completo.
+              </p>
+              <Link
+                href="/catalogo"
+                className="inline-flex items-center gap-2 bg-gray-900 text-white text-xs font-bold px-5 py-2.5 rounded-xl hover:bg-gray-800 transition"
               >
-                Restablecer filtros
-              </button>
+                Explorar Catálogo Completo <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {filteredProducts.map((product) => (
+              {latestPhones.map((phone) => (
                 <article
-                  key={product.id}
-                  className="group bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:transform hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between"
+                  key={phone.id}
+                  className="group bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between"
                 >
                   <div>
-                    {/* Imagen del producto */}
+                    {/* Imagen del teléfono */}
                     <div className="relative bg-gray-50/70 h-72 flex items-center justify-center overflow-hidden p-6">
                       <img
-                        src={resolveProductImage(product.image)}
-                        alt={product.name}
+                        src={phone.image}
+                        alt={phone.name}
                         className="object-contain max-h-full max-w-full group-hover:scale-105 transition-transform duration-300"
                         onError={(e) => {
                           const target = e.currentTarget as HTMLImageElement;
@@ -409,21 +364,18 @@ export default function Home() {
                         }}
                       />
 
-                      {/* Badges */}
-                      <div className="absolute top-4 right-4">
-                        {product.badge && (
-                          <span
-                            className={`inline-block px-3 py-1 rounded-full text-white text-xs font-semibold ${product.badgeColor || "bg-blue-600"}`}
-                          >
-                            {product.badge}
-                          </span>
-                        )}
+                      {/* Badge de Categoría */}
+                      <div className="absolute top-4 left-4">
+                        <span className="inline-block px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-sm text-gray-700 text-xs font-semibold border border-gray-200/60 shadow-xs">
+                          {phone.category}
+                        </span>
                       </div>
 
-                      {product.category && (
-                        <div className="absolute top-4 left-4">
-                          <span className="inline-block px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-sm text-gray-700 text-xs font-semibold border border-gray-200/60">
-                            {product.category}
+                      {/* Badge de Estado / Garantía */}
+                      {phone.badge && (
+                        <div className="absolute top-4 right-4">
+                          <span className={`inline-block px-3 py-1 rounded-full text-white text-xs font-semibold ${phone.badgeColor}`}>
+                            {phone.badge}
                           </span>
                         </div>
                       )}
@@ -432,13 +384,17 @@ export default function Home() {
                     {/* Contenido de la card */}
                     <div className="p-6 space-y-4">
                       <div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-1">{product.name}</h3>
-                        <p className="text-gray-500 text-xs leading-relaxed line-clamp-2">{product.subtitle}</p>
+                        <h3 className="text-xl font-bold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">
+                          {phone.name}
+                        </h3>
+                        <p className="text-gray-500 text-xs leading-relaxed line-clamp-2">
+                          {phone.subtitle}
+                        </p>
                       </div>
 
                       {/* Características */}
                       <ul className="space-y-1">
-                        {product.features?.slice(0, 3).map((feature: string, index: number) => (
+                        {phone.features.map((feature, index) => (
                           <li key={index} className="flex items-center text-xs text-gray-600">
                             <Star className="h-3 w-3 text-amber-500 mr-2 shrink-0 fill-amber-500" />
                             {feature}
@@ -449,29 +405,59 @@ export default function Home() {
                       {/* Precio y estado */}
                       <div className="flex justify-between items-center pt-2 border-t border-gray-100">
                         <div className="flex items-baseline space-x-1.5">
-                          <span className="text-2xl font-extrabold text-gray-900">{product.price}</span>
+                          <span className="text-2xl font-extrabold text-gray-900">{phone.price}</span>
                           <span className="text-xs text-gray-500">USD</span>
                         </div>
-                        <span className={`text-xs font-semibold ${product.statusColor}`}>{product.status}</span>
+                        <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-md border ${phone.statusColor}`}>
+                          {phone.status}
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Botones de acción */}
-                  <div className="p-6 pt-0 space-y-2">
+                  {/* Botón de acción */}
+                  <div className="p-6 pt-0">
                     <button
-                      onClick={() => handleAddToCart(product)}
-                      className="w-full bg-gray-900 text-white py-3 rounded-xl font-semibold hover:bg-gray-800 transition-all duration-200 shadow-sm flex items-center justify-center gap-2"
+                      onClick={() => handleAddToCart(phone)}
+                      disabled={phone.stock <= 0}
+                      className={`w-full py-3 rounded-xl font-semibold transition-all duration-200 shadow-sm flex items-center justify-center gap-2 ${
+                        phone.stock > 0
+                          ? "bg-gray-900 text-white hover:bg-gray-800 cursor-pointer"
+                          : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      }`}
                     >
-                      <ShoppingBag className="w-4 h-4" /> Agregar a la bolsa
+                      <ShoppingBag className="w-4 h-4" />
+                      {phone.stock > 0 ? "Agregar a la bolsa" : "Agotado"}
                     </button>
                   </div>
                 </article>
               ))}
             </div>
           )}
+
+          {/* Banner con enlace al catálogo completo */}
+          <div className="mt-14 p-6 sm:p-8 rounded-2xl bg-gradient-to-r from-gray-900 to-blue-950 text-white flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl">
+            <div className="space-y-1 text-center sm:text-left">
+              <div className="inline-flex items-center gap-1.5 text-blue-300 text-xs font-semibold">
+                <Gamepad2 className="w-4 h-4" /> PlayStation, Nintendo Switch, Controles y Accesorios
+              </div>
+              <h3 className="text-xl font-bold">
+                ¿Buscás consolas de videojuegos o accesorios?
+              </h3>
+              <p className="text-gray-300 text-xs sm:text-sm max-w-xl">
+                Encontrá consolas PS5, Nintendo Switch OLED, mandos DualSense y accesorios certificados en nuestro catálogo general.
+              </p>
+            </div>
+
+            <Link
+              href="/catalogo"
+              className="bg-white text-gray-900 hover:bg-gray-100 px-6 py-3 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap shadow-md shrink-0 flex items-center gap-2"
+            >
+              Explorar Todo el Catálogo <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
-      </main>
+      </section>
 
       {/* Banner de Servicio Técnico */}
       <section className="bg-gradient-to-r from-gray-900 via-blue-950 to-gray-900 text-white py-16" id="soporte">
@@ -554,14 +540,14 @@ export default function Home() {
                 <span className="text-xl font-bold">DetchPlus</span>
               </div>
               <p className="text-gray-400 text-xs leading-relaxed">
-                Tu plataforma de confianza para adquirir dispositivos Apple y gestionar reparaciones técnicas oficiales.
+                Tu plataforma de confianza para adquirir smartphones, consolas y gestionar reparaciones técnicas oficiales.
               </p>
             </div>
 
             <div>
               <h4 className="font-semibold text-sm mb-3">Navegación</h4>
               <ul className="space-y-2 text-xs text-gray-400">
-                <li><Link href="#productos" className="hover:text-white transition">Catálogo</Link></li>
+                <li><Link href="/catalogo" className="hover:text-white transition">Catálogo</Link></li>
                 <li><button onClick={() => setIsTrackingOpen(true)} className="hover:text-white transition">Rastreo de Reparaciones</button></li>
                 <li><Link href="/checkout" className="hover:text-white transition">Bolsa de Compras</Link></li>
               </ul>
@@ -585,7 +571,7 @@ export default function Home() {
           </div>
 
           <div className="border-t border-gray-900 mt-8 pt-8 text-center text-xs text-gray-500">
-            © 2024 DetchPlus. Todos los derechos reservados.
+            © 2026 DetchPlus. Todos los derechos reservados.
           </div>
         </div>
       </footer>

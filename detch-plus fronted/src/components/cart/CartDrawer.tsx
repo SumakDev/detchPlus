@@ -54,7 +54,10 @@ export default function CartDrawer() {
                 </p>
                 <Button
                   variant="outline"
-                  onClick={() => setIsOpen(false)}
+                  onClick={() => {
+                    setIsOpen(false);
+                    router.push("/catalogo");
+                  }}
                   className="rounded-xl px-6"
                 >
                   Explorar catálogo
