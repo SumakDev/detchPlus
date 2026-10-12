@@ -65,25 +65,29 @@ export default function StockPage() {
   }, [items]);
 
   function exportCsv() {
-    const csv = [
-      ["ID_PRO", "Código", "Nombre", "Ubicación", "Disponible", "Reservado", "Mínimo"],
+    const escapeCsv = (val: any) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+    const rows = [
+      ["ID", "Código", "Producto", "Ubicación", "Estado", "Disponible", "Reservado", "Mínimo"],
       ...filtered.map((r) => [
         r.id,
-        r.producto?.codigo || "",
-        r.producto?.nombre || "",
-        r.ubicacion || "",
+        r.producto?.codigo || "S/C",
+        r.producto?.nombre || `Producto #${r.id}`,
+        r.ubicacion || "Bodega Central",
+        r.estado || "OK",
         r.disponible,
         r.reservado,
         r.minimo,
       ]),
-    ]
-      .map((row) => row.join(","))
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
+    ];
+
+    const csvLines = rows.map((row) => row.map(escapeCsv).join(";"));
+    const csvContent = "\uFEFF" + csvLines.join("\r\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "stock.csv";
+    a.download = `stock_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }

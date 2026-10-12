@@ -29,6 +29,9 @@ export default function ServicioTecnicoPage() {
   const [openNew, setOpenNew] = useState(false);
   const [editRow, setEditRow] = useState<ServicioTecnico | null>(null);
   const [openEdit, setOpenEdit] = useState(false);
+  const [statusRow, setStatusRow] = useState<ServicioTecnico | null>(null);
+  const [modalStatus, setModalStatus] = useState<ServicioTecnico["EST_SER"]>("RECIBIDO");
+  const [savingStatus, setSavingStatus] = useState(false);
 
   // Protección: bloquear rol 4 y no autenticados
   useEffect(() => {
@@ -127,22 +130,91 @@ export default function ServicioTecnicoPage() {
             setEditRow(row);
             setOpenEdit(true);
           }}
-          onChangeStatus={async (row) => {
-            const next = prompt(
-              `Nuevo estado para servicio #${row.NUM_SER} (RECIBIDO, EN_PROCESO, TERMINADO, ENTREGADO):`,
-              row.EST_SER
-            );
-            if (!next) return;
-            const val = next.toUpperCase().trim();
-            if (!["RECIBIDO", "EN_PROCESO", "TERMINADO", "ENTREGADO"].includes(val)) {
-              alert("Estado inválido");
-              return;
+          onChangeStatus={async (row, newStatus) => {
+            if (newStatus) {
+              try {
+                await updateServicioEstado(row.NUM_SER, newStatus);
+                await load();
+              } catch (e: any) {
+                alert(e?.message || "Error al actualizar estado");
+              }
+            } else {
+              setStatusRow(row);
+              setModalStatus(row.EST_SER);
             }
-            await updateServicioEstado(row.NUM_SER, val as any);
-            await load();
           }}
         />
       )}
+
+      {/* Modal Cambiar Estado */}
+      <Dialog open={!!statusRow} onOpenChange={(open) => !open && setStatusRow(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Actualizar Estado — OT #{statusRow?.NUM_SER}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-xs text-gray-500">
+              Cliente: <strong className="text-gray-800">{statusRow?.cliente?.nombreCompleto || statusRow?.CED_CLI}</strong> | Técnico: <strong className="text-gray-800">{statusRow?.tecnico?.NOM_TEC || statusRow?.ID_TEC}</strong>
+            </p>
+
+            <div className="grid grid-cols-1 gap-2.5">
+              {[
+                { val: "RECIBIDO", title: "RECIBIDO", desc: "Dispositivo ingresado al taller, esperando revisión", color: "blue" },
+                { val: "EN_PROCESO", title: "EN PROCESO", desc: "Técnico trabajando activamente en el diagnóstico o reparación", color: "amber" },
+                { val: "TERMINADO", title: "TERMINADO", desc: "Reparación completada y verificada, listo para retiro", color: "emerald" },
+                { val: "ENTREGADO", title: "ENTREGADO", desc: "Equipo entregado formalmente al cliente", color: "purple" },
+              ].map((opt) => (
+                <label
+                  key={opt.val}
+                  onClick={() => setModalStatus(opt.val as any)}
+                  className={`p-3 rounded-xl border-2 flex items-start justify-between cursor-pointer transition ${
+                    modalStatus === opt.val
+                      ? "border-gray-900 bg-gray-50 shadow-xs"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <div>
+                    <p className="font-bold text-sm text-gray-900">{opt.title}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{opt.desc}</p>
+                  </div>
+                  <input
+                    type="radio"
+                    name="statusSelect"
+                    checked={modalStatus === opt.val}
+                    onChange={() => setModalStatus(opt.val as any)}
+                    className="mt-1"
+                  />
+                </label>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t">
+              <Button variant="outline" onClick={() => setStatusRow(null)}>
+                Cancelar
+              </Button>
+              <Button
+                disabled={savingStatus}
+                onClick={async () => {
+                  if (!statusRow) return;
+                  try {
+                    setSavingStatus(true);
+                    await updateServicioEstado(statusRow.NUM_SER, modalStatus);
+                    setStatusRow(null);
+                    await load();
+                  } catch (err: any) {
+                    alert(err?.message || "Error al actualizar estado");
+                  } finally {
+                    setSavingStatus(false);
+                  }
+                }}
+                className="bg-gray-900 text-white hover:bg-gray-800"
+              >
+                {savingStatus ? "Guardando..." : "Guardar Estado"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Crear */}
       <Dialog open={openNew} onOpenChange={setOpenNew}>

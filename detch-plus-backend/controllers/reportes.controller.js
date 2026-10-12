@@ -1,4 +1,15 @@
-import { FACTURAS, PRODUCTOS, CLIENTES, SER_TEC, STOCK } from "../models/index.js";
+import {
+  FACTURAS,
+  PRODUCTOS,
+  CLIENTES,
+  SER_TEC,
+  STOCK,
+  TECNICOS,
+  DET_SER,
+  MARCAS,
+  MODELOS,
+  CATEGORIAS,
+} from "../models/index.js";
 
 // GET /api/reportes/resumen
 export async function getResumen(req, res) {
@@ -12,7 +23,7 @@ export async function getResumen(req, res) {
     ]);
 
     const generadosMes = (facturasCount > 0 ? 1 : 0) + (serviciosCount > 0 ? 1 : 0) + 2;
-    const pendientes = stockAgotado > 0 ? 1 : 0;
+    const pendientes = 0; // Todos los reportes analíticos están generados y disponibles
 
     const recientes = [
       {
@@ -24,19 +35,20 @@ export async function getResumen(req, res) {
       {
         id: "rep-inventario-stock",
         nombre: "Auditoría de Existencias y Stock Crítico",
-        fecha: new Date(Date.now() - 3600000 * 24).toISOString(),
-        estado: stockAgotado > 0 ? "PENDIENTE" : "LISTO",
+        fecha: new Date().toISOString(),
+        estado: "LISTO",
+        alertas: stockAgotado > 0 ? `${stockAgotado} productos agotados` : "Stock estable",
       },
       {
         id: "rep-servicio-tecnico",
         nombre: "Rendimiento y Órdenes de Servicio Técnico",
-        fecha: new Date(Date.now() - 3600000 * 48).toISOString(),
+        fecha: new Date().toISOString(),
         estado: "LISTO",
       },
       {
         id: "rep-clientes-actividad",
         nombre: "Reporte de Clientes y Recurrencia",
-        fecha: new Date(Date.now() - 3600000 * 72).toISOString(),
+        fecha: new Date().toISOString(),
         estado: "LISTO",
       },
     ];
@@ -50,6 +62,7 @@ export async function getResumen(req, res) {
         productos: productosCount,
         clientes: clientesCount,
         servicios: serviciosCount,
+        stockAgotado,
       },
     });
   } catch (error) {
@@ -63,19 +76,49 @@ export async function getDatos(req, res) {
   try {
     const { tipo } = req.query; // "ventas", "stock", "servicios", "clientes"
     if (tipo === "ventas") {
-      const facturas = await FACTURAS.findAll({ order: [["FEC_FAC", "DESC"]], limit: 50 });
+      const facturas = await FACTURAS.findAll({
+        include: [{ model: CLIENTES, as: "cliente", attributes: ["CED_CLI", "NOM_CLI", "APE_CLI", "NUM_CLI"] }],
+        order: [["FEC_FAC", "DESC"]],
+        limit: 100,
+      });
       return res.json(facturas);
     }
     if (tipo === "stock") {
-      const stocks = await STOCK.findAll({ include: [{ model: PRODUCTOS, as: "producto" }], limit: 50 });
+      const stocks = await STOCK.findAll({
+        include: [
+          {
+            model: PRODUCTOS,
+            as: "producto",
+            attributes: ["ID_PRO", "DES_PRO", "COD_BAR_PRO", "EST_PRO", "ORG_PRO"],
+            include: [
+              { model: MARCAS, as: "marca", attributes: ["NOM_MAR"], required: false },
+              { model: MODELOS, as: "modelo", attributes: ["NOM_MOD"], required: false },
+              { model: CATEGORIAS, as: "categoria", attributes: ["NOM_CAT"], required: false },
+            ],
+          },
+        ],
+        order: [["CAN_DIS_STO", "ASC"]],
+        limit: 100,
+      });
       return res.json(stocks);
     }
     if (tipo === "servicios") {
-      const servicios = await SER_TEC.findAll({ order: [["FEC_SER", "DESC"]], limit: 50 });
+      const servicios = await SER_TEC.findAll({
+        include: [
+          { model: CLIENTES, as: "cliente", attributes: ["CED_CLI", "NOM_CLI", "APE_CLI", "NUM_CLI"] },
+          { model: TECNICOS, as: "tecnico", attributes: ["ID_TEC", "NOM_TEC"] },
+          { model: DET_SER, as: "detalle" },
+        ],
+        order: [["FEC_SER", "DESC"]],
+        limit: 100,
+      });
       return res.json(servicios);
     }
     if (tipo === "clientes") {
-      const clientes = await CLIENTES.findAll({ order: [["FEC_REG_CLI", "DESC"]], limit: 50 });
+      const clientes = await CLIENTES.findAll({
+        order: [["FEC_REG_CLI", "DESC"]],
+        limit: 100,
+      });
       return res.json(clientes);
     }
 
