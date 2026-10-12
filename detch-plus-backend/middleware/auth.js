@@ -29,6 +29,7 @@ export function requireAuth() {
         NOM_USU: user.NOM_USU,
         APE_USU: user.APE_USU,
         AVA_USU: user.AVA_USU || null,
+        USR_USU: user.USR_USU || "-",
       };
       next();
     } catch (e) {
