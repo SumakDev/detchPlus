@@ -7,6 +7,8 @@ const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
+console.log("Resend activo:", !!resend);
+
 let transporter = null;
 
 async function getTransporter() {
