@@ -125,10 +125,19 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   return (
-    <div className={`min-h-screen ${theme.bg} flex ${fontClass}`}>
+    <div className={`min-h-screen ${theme.bg} flex ${fontClass} w-full overflow-x-hidden relative`}>
+      {/* Backdrop overlay para mobile */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-gray-950/60 backdrop-blur-xs z-40 lg:hidden transition-opacity animate-in fade-in duration-200"
+          onClick={() => setSidebarOpen(false)}
+          aria-label="Cerrar menú lateral"
+        />
+      )}
+
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 w-72 shadow-lg transform ${motionClass} ease-in-out z-50 lg:static lg:translate-x-0 flex flex-col ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} `}
+        className={`fixed inset-y-0 left-0 w-72 max-w-[82vw] bg-white border-r border-gray-200 shadow-2xl transform ${motionClass} ease-in-out z-50 lg:static lg:translate-x-0 flex flex-col ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         {/* Brand */}
         <div className={`bg-gradient-to-r ${theme.brand} ${theme.brandText} px-4 py-4 flex items-center justify-between`}>
@@ -150,7 +159,7 @@ export default function Layout({ children }: LayoutProps) {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
+        <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1 bg-white">
           {navigation.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -184,7 +193,7 @@ export default function Layout({ children }: LayoutProps) {
         </nav>
 
         {/* Accesibilidad (compacto y claro) */}
-        <div className="px-3 py-4 border-t border-gray-200 bg-white/80 backdrop-blur">
+        <div className="px-3 py-4 border-t border-gray-200 bg-white">
           <Button
             variant="outline"
             onClick={() => setSettingsOpen((v) => !v)}
@@ -250,48 +259,48 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       </aside>
 
-      {/* Main */}
-      <div className="flex-1 flex flex-col min-h-screen">
+      {/* Main Container */}
+      <div className="flex-1 flex flex-col min-h-screen w-full min-w-0 overflow-x-hidden">
         {/* Topbar (mobile) */}
-        <header className={`lg:hidden ${theme.panel} shadow-sm px-4 py-3`}>
+        <header className={`lg:hidden ${theme.panel} shadow-sm px-3 sm:px-4 py-2.5`}>
           <div className="flex items-center justify-between">
-            <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="p-2">
+            <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="p-2 h-9 w-9">
               <Menu className="h-5 w-5" />
             </Button>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <Apple className="h-5 w-5 text-gray-800" />
-              <h1 className="text-base font-semibold">DetchPlus</h1>
+              <h1 className="text-base font-bold tracking-tight">DetchPlus</h1>
             </div>
             <div className="w-9" />
           </div>
         </header>
 
         {/* Breadcrumb + actions */}
-        <nav className={`${theme.crumbBg} border-b px-4 py-2`}>
+        <nav className={`${theme.crumbBg} border-b px-3 sm:px-4 py-2`}>
           <div className="flex items-center justify-between gap-2">
-            <ol className="flex items-center space-x-2 text-sm">
+            <ol className="flex items-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm shrink min-w-0">
               <li>
                 <Link href="/dashboard" className="text-gray-500 hover:text-gray-700">
                   Inicio
                 </Link>
               </li>
               <li className="text-gray-400">/</li>
-              <li className="text-gray-900 font-medium capitalize">{pageTitle}</li>
+              <li className="text-gray-900 font-medium capitalize truncate max-w-[130px] sm:max-w-none">{pageTitle}</li>
             </ol>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               {userName && (
-                <span className="hidden sm:inline text-sm text-gray-600">Hola, {userName}</span>
+                <span className="hidden md:inline text-xs sm:text-sm text-gray-600 truncate max-w-[120px]">Hola, {userName}</span>
               )}
-              <Button variant="outline" size="sm" onClick={logout} className={motionClass}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Salir
+              <Button variant="outline" size="sm" onClick={logout} className={`${motionClass} text-xs px-2.5 py-1 h-8`}>
+                <LogOut className="h-3.5 w-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">Salir</span>
               </Button>
             </div>
           </div>
         </nav>
 
         {/* Content */}
-        <main className="flex-1 p-4 md:p-6">{children}</main>
+        <main className="flex-1 p-3 sm:p-4 md:p-6 w-full min-w-0 overflow-x-hidden">{children}</main>
 
         {/* Footer */}
         <footer className="bg-white/80 backdrop-blur border-t p-3 text-center text-xs text-gray-600">

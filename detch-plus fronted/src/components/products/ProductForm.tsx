@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import ImageUploader from "./ImageUploader";
 import { fetchCategorias, fetchMarcas, fetchModelosByMarca } from "@/lib/api/catalogos";
+import { Link as LinkIcon, Upload, Trash2, CheckCircle2 } from "lucide-react";
 
 export default function ProductForm({
   producto,
@@ -28,13 +29,17 @@ export default function ProductForm({
     ORG_PRO: "COMPRA_NUEVA",
     EST_PRO: "NUEVO",
     ACT_PRO: true,
+    imageMode: "url" as "file" | "url",
     imageFile: null as File | null,
+    imageUrl: "",
+    removeImage: false,
   });
 
   const [categorias, setCategorias] = useState<Array<{ ID_CAT: number; NOM_CAT: string }>>([]);
   const [marcas, setMarcas] = useState<Array<{ ID_MAR: number; NOM_MAR: string }>>([]);
   const [modelos, setModelos] = useState<Array<{ ID_MOD: string; NOM_MOD: string }>>([]);
   const [existingImg, setExistingImg] = useState<string | undefined>(undefined);
+  const [urlImgValid, setUrlImgValid] = useState<boolean | null>(null);
 
   useEffect(() => {
     fetchCategorias().then(setCategorias).catch(() => setCategorias([]));
@@ -52,6 +57,7 @@ export default function ProductForm({
 
   useEffect(() => {
     if (producto) {
+      const isHttp = /^https?:\/\//i.test(producto.IMG_URL || "");
       setForm({
         COD_BAR_PRO: producto.COD_BAR_PRO || "",
         IME_PRO: producto.IME_PRO || "",
@@ -59,10 +65,13 @@ export default function ProductForm({
         ID_MAR: producto.ID_MAR ?? "",
         ID_MOD: producto.ID_MOD ?? "",
         DES_PRO: producto.DES_PRO || "",
-        ORG_PRO: producto.ORG_PRO,
-        EST_PRO: producto.EST_PRO,
-        ACT_PRO: !!producto.ACT_PRO,
+        ORG_PRO: producto.ORG_PRO || "COMPRA_NUEVA",
+        EST_PRO: producto.EST_PRO || "NUEVO",
+        ACT_PRO: producto.ACT_PRO !== undefined ? !!producto.ACT_PRO : true,
+        imageMode: isHttp ? "url" : "file",
         imageFile: null,
+        imageUrl: isHttp ? producto.IMG_URL : "",
+        removeImage: false,
       });
       setExistingImg(producto.IMG_URL);
     }
@@ -88,7 +97,16 @@ export default function ProductForm({
     fd.append("ORG_PRO", form.ORG_PRO);
     fd.append("EST_PRO", form.EST_PRO);
     fd.append("ACT_PRO", String(!!form.ACT_PRO));
-    if (form.imageFile) fd.append("image", form.imageFile);
+
+    // Lógica híbrida para la imagen
+    if (form.removeImage) {
+      fd.append("removeImage", "true");
+    } else if (form.imageMode === "file" && form.imageFile) {
+      fd.append("image", form.imageFile);
+    } else if (form.imageMode === "url" && form.imageUrl.trim()) {
+      fd.append("IMG_URL", form.imageUrl.trim());
+    }
+
     await onSubmit(fd);
   }
 
@@ -155,25 +173,164 @@ export default function ProductForm({
         <textarea id="DES_PRO" name="DES_PRO" value={form.DES_PRO} onChange={handleChange} className="min-h-[80px] border rounded px-3 py-2 text-sm" />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <ImageUploader
-          value={form.imageFile}
-          onChange={(f) => {
-            setForm((p) => ({ ...p, imageFile: f }));
-            if (f) setExistingImg(undefined);
-          }}
-        />
-        {existingImg && (
+      {/* Selector Híbrido de Imagen */}
+      <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/50 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <Label className="text-sm font-medium text-gray-700">Imagen actual</Label>
-            <div className="mt-2">
-              <img src={existingImg} alt="actual" className="h-24 w-24 object-cover rounded border" />
+            <Label className="text-sm font-semibold text-gray-800">Imagen del Producto</Label>
+            <p className="text-xs text-gray-500">Puedes pegar un enlace web directo o subir un archivo</p>
+          </div>
+
+          {/* Toggle de Modo */}
+          <div className="flex items-center gap-1 bg-gray-200/70 p-1 rounded-lg self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => {
+                setForm((p) => ({ ...p, imageMode: "url", removeImage: false }));
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md transition ${
+                form.imageMode === "url"
+                  ? "bg-white text-gray-900 shadow-xs"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              <LinkIcon className="w-3.5 h-3.5 text-blue-600" /> Enlace Web (URL)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setForm((p) => ({ ...p, imageMode: "file", removeImage: false }));
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md transition ${
+                form.imageMode === "file"
+                  ? "bg-white text-gray-900 shadow-xs"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              <Upload className="w-3.5 h-3.5 text-purple-600" /> Subir Archivo
+            </button>
+          </div>
+        </div>
+
+        {/* Input según el modo seleccionado */}
+        {form.imageMode === "url" ? (
+          <div className="space-y-2">
+            <div className="relative">
+              <Input
+                type="url"
+                placeholder="https://ejemplo.com/imagenes/iphone-15.jpg"
+                value={form.imageUrl}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setForm((p) => ({ ...p, imageUrl: val, removeImage: false }));
+                  setUrlImgValid(null);
+                  if (val.trim()) setExistingImg(undefined);
+                }}
+                className="text-xs bg-white pr-9"
+              />
+              {urlImgValid && (
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute right-3 top-1/2 -translate-y-1/2" />
+              )}
             </div>
+            <p className="text-[11px] text-gray-500">
+              Ideal para imágenes alojadas en internet (Apple, Sony, Unsplash, Imgur, etc.). No se borran con reinicios de servidor.
+            </p>
+
+            {/* Preview de URL */}
+            {form.imageUrl.trim() && (
+              <div className="flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-200">
+                <img
+                  src={form.imageUrl.trim()}
+                  alt="Vista previa URL"
+                  className="h-16 w-16 object-contain rounded border bg-gray-50 shrink-0"
+                  onLoad={() => setUrlImgValid(true)}
+                  onError={() => setUrlImgValid(false)}
+                />
+                <div className="text-xs overflow-hidden">
+                  <p className="font-semibold text-gray-800">Vista previa del enlace</p>
+                  {urlImgValid === false ? (
+                    <p className="text-amber-600 text-[11px]">No se pudo cargar la imagen desde este enlace.</p>
+                  ) : (
+                    <p className="text-emerald-600 text-[11px]">Imagen cargada correctamente.</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForm((p) => ({ ...p, imageUrl: "", removeImage: true }));
+                      setUrlImgValid(null);
+                    }}
+                    className="text-red-600 hover:underline text-[11px] font-medium mt-1 inline-flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3 h-3" /> Quitar este enlace
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <ImageUploader
+            value={form.imageFile}
+            onChange={(f) => {
+              setForm((p) => ({ ...p, imageFile: f, removeImage: false }));
+              if (f) setExistingImg(undefined);
+            }}
+          />
+        )}
+
+        {/* Imagen Actual (si existe en BD y no ha sido reemplazada ni borrada) */}
+        {existingImg && !form.removeImage && (
+          <div className="pt-2 border-t border-gray-200 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <img
+                src={existingImg}
+                alt="Imagen actual"
+                className="h-14 w-14 object-contain rounded border bg-white p-1"
+                onError={(e) => {
+                  const target = e.currentTarget as HTMLImageElement;
+                  if (!target.src.endsWith("/images/iphone15.jpg")) {
+                    target.src = "/images/iphone15.jpg";
+                  }
+                }}
+              />
+              <div>
+                <p className="text-xs font-semibold text-gray-800">Imagen registrada actualmente</p>
+                <p className="text-[11px] text-gray-500 truncate max-w-xs">{existingImg}</p>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setForm((p) => ({ ...p, removeImage: true, imageUrl: "", imageFile: null }));
+                setExistingImg(undefined);
+              }}
+              className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1" /> Quitar imagen
+            </Button>
+          </div>
+        )}
+
+        {form.removeImage && (
+          <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-center justify-between">
+            <span>La imagen actual será eliminada al guardar cambios.</span>
+            <button
+              type="button"
+              onClick={() => {
+                setForm((p) => ({ ...p, removeImage: false }));
+                if (producto?.IMG_URL) setExistingImg(producto.IMG_URL);
+              }}
+              className="text-xs font-semibold text-amber-900 underline ml-2"
+            >
+              Deshacer
+            </button>
           </div>
         )}
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 pt-2">
         <label className="inline-flex items-center gap-2 text-sm text-gray-700">
           <input type="checkbox" name="ACT_PRO" checked={!!form.ACT_PRO} onChange={handleChange} />
           Activo

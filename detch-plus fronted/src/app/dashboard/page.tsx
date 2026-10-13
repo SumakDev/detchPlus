@@ -139,19 +139,19 @@ export default function DashboardPage() {
             </h1>
             <p className="text-gray-600">Resumen general de operaciones, ventas, inventario y métricas</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Link href="/ventas">
-              <Button className="bg-gray-900 hover:bg-gray-800 flex items-center gap-1.5 shadow-sm">
+              <Button className="bg-gray-900 hover:bg-gray-800 flex items-center gap-1.5 shadow-sm text-xs sm:text-sm h-9">
                 <ShoppingCart className="w-4 h-4" /> Nueva Venta
               </Button>
             </Link>
             <Link href="/" target="_blank">
-              <Button variant="outline" className="flex items-center gap-1.5">
+              <Button variant="outline" className="flex items-center gap-1.5 text-xs sm:text-sm h-9">
                 <Store className="w-4 h-4" /> Tienda Online
               </Button>
             </Link>
             <Link href="/perfil">
-              <Button variant="outline" className="flex items-center gap-1.5">
+              <Button variant="outline" className="flex items-center gap-1.5 text-xs sm:text-sm h-9">
                 <User className="w-4 h-4" /> Mi Perfil
               </Button>
             </Link>

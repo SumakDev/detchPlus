@@ -103,6 +103,10 @@ export async function create(req, res) {
       }
     }
 
+    const imgUrlToSave = file
+      ? file.filename
+      : (body.IMG_URL && String(body.IMG_URL).trim().length > 0 ? String(body.IMG_URL).trim() : null);
+
     const created = await PRODUCTOS.create(
       {
         COD_BAR_PRO: body.COD_BAR_PRO || null,
@@ -117,7 +121,7 @@ export async function create(req, res) {
         ID_PRV: body.ID_PRV ? Number(body.ID_PRV) : null,
         ACT_PRO: body.ACT_PRO !== undefined ? (String(body.ACT_PRO) === "true" || body.ACT_PRO === true) : true,
         FEC_MOD_PRO: new Date(),
-        IMG_URL: file ? file.filename : null,
+        IMG_URL: imgUrlToSave,
       },
       { transaction: t }
     );
@@ -161,7 +165,7 @@ export async function update(req, res) {
     const { id } = req.params;
     const body = req.body || {};
     const file = req.file;
-    console.log("POST /productos -> file?", !!file, "body keys:", Object.keys(body));
+    console.log("PUT /productos/:id -> file?", !!file, "body keys:", Object.keys(body));
     const row = await PRODUCTOS.findByPk(id);
     if (!row) return res.status(404).json({ error: "No encontrado" });
 
@@ -183,6 +187,16 @@ export async function update(req, res) {
 
     const prevImg = row.IMG_URL;
 
+    let nextImg = row.IMG_URL;
+    if (file) {
+      nextImg = file.filename;
+    } else if (body.removeImage === "true" || body.removeImage === true) {
+      nextImg = null;
+    } else if (body.IMG_URL !== undefined) {
+      const trimmed = String(body.IMG_URL || "").trim();
+      nextImg = trimmed.length > 0 ? trimmed : null;
+    }
+
     await row.update({
       COD_BAR_PRO: body.COD_BAR_PRO ?? row.COD_BAR_PRO,
       IME_PRO: body.IME_PRO ?? row.IME_PRO,
@@ -195,10 +209,12 @@ export async function update(req, res) {
       ID_PRV: body.ID_PRV !== undefined ? Number(body.ID_PRV) : row.ID_PRV,
       ACT_PRO: body.ACT_PRO !== undefined ? (String(body.ACT_PRO) === "true" || body.ACT_PRO === true) : row.ACT_PRO,
       FEC_MOD_PRO: new Date(),
-      IMG_URL: file ? file.filename : row.IMG_URL,
+      IMG_URL: nextImg,
     });
 
-    if (file && prevImg && prevImg !== row.IMG_URL) deleteIfExists(prevImg);
+    if (nextImg !== prevImg && prevImg && !prevImg.startsWith("http://") && !prevImg.startsWith("https://")) {
+      deleteIfExists(prevImg);
+    }
 
     const withInclude = await PRODUCTOS.findByPk(id, {
       include: [

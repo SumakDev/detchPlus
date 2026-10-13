@@ -89,12 +89,12 @@ async function handleUpdate(fd: FormData) {
   return (
     <Layout>
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">
               Productos
             </h1>
-            <p className="text-gray-600">
+            <p className="text-xs sm:text-sm text-gray-500">
               Gestiona productos, relaciones y sus imágenes
             </p>
           </div>
@@ -103,20 +103,21 @@ async function handleUpdate(fd: FormData) {
               setEditing(null);
               setOpenUpsert(true);
             }}
+            className="self-start sm:self-auto text-xs sm:text-sm h-9 sm:h-10"
           >
-            <Plus className="h-4 w-4 mr-2" /> Agregar
+            <Plus className="h-4 w-4 mr-1.5" /> Agregar producto
           </Button>
         </div>
 
-        <div className="bg-white border rounded-lg p-3 flex items-center gap-3">
+        <div className="bg-white border border-gray-200 rounded-xl p-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <Input
-            placeholder="Buscar por nombre, código de barras, IMEI o ID"
+            placeholder="Buscar por nombre, código de barras, IMEI o ID..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="max-w-sm"
+            className="w-full sm:max-w-sm text-xs sm:text-sm"
           />
-          <Button variant="outline" onClick={load}>
-            Aplicar
+          <Button variant="outline" onClick={load} className="text-xs sm:text-sm shrink-0">
+            Aplicar filtro
           </Button>
         </div>
 

@@ -51,4 +51,6 @@ export type ProductoFormData = {
   ACT_PRO: boolean;
 
   imageFile?: File | null;
+  IMG_URL?: string;
+  removeImage?: boolean;
 };
