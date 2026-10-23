@@ -223,3 +223,60 @@ export async function verifyEmail(req, res) {
     return res.status(500).json({ error: "Error al verificar el correo electrónico" });
   }
 }
+
+// POST /api/auth/resend-verification
+export async function resendVerification(req, res) {
+  try {
+    const { email } = req.body || {};
+    let user = null;
+
+    // Verificar si viene token Bearer en cabecera
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded?.sub) {
+          user = await USUARIOS.findByPk(decoded.sub);
+        }
+      } catch {}
+    }
+
+    // Si no se obtuvo por sesión, buscar por email o usuario en body
+    if (!user && email && String(email).trim()) {
+      const target = String(email).trim();
+      user = await USUARIOS.findOne({
+        where: { [Op.or]: [{ COR_USU: target }, { USR_USU: target }] },
+      });
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: "No se encontró el usuario o correo especificado." });
+    }
+
+    if (user.COR_VER_USU) {
+      return res.json({ message: "Tu correo electrónico ya se encuentra verificado." });
+    }
+
+    // Generar nuevo token seguro y actualizar
+    const verifyToken = crypto.randomBytes(32).toString("hex");
+    await user.update({
+      TOK_VER_USU: verifyToken,
+      FEC_ACT_USU: new Date(),
+    });
+
+    const emailResult = await sendVerificationEmail(
+      user.COR_USU,
+      user.NOM_USU || user.USR_USU || "Cliente",
+      verifyToken
+    );
+
+    return res.json({
+      message: "Correo de verificación reenviado exitosamente. Por favor revisa tu bandeja de entrada o spam.",
+      emailPreview: emailResult?.previewUrl || null,
+    });
+  } catch (error) {
+    console.error("auth.resendVerification", error);
+    return res.status(500).json({ error: "Error al reenviar el correo de verificación" });
+  }
+}

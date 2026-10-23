@@ -16,6 +16,7 @@ export type MeUser = {
   AVA_USU?: string | null;
   EMAIL?: string;
   USUARIO?: string;
+  COR_VER_USU?: boolean | number;
   TEL_USU?: string;
   CEDULA?: string;
   ID_PERSONA?: string;

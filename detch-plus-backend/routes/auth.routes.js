@@ -1,5 +1,13 @@
 import { Router } from "express";
-import { login, register, me, forgotPassword, resetPassword, verifyEmail } from "../controllers/auth.controller.js";
+import {
+  login,
+  register,
+  me,
+  forgotPassword,
+  resetPassword,
+  verifyEmail,
+  resendVerification,
+} from "../controllers/auth.controller.js";
 import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
@@ -15,5 +23,6 @@ router.post("/reset-password", resetPassword);
 // Verificación de email
 router.get("/verify-email", verifyEmail);
 router.post("/verify-email", verifyEmail);
+router.post("/resend-verification", resendVerification);
 
 export default router;

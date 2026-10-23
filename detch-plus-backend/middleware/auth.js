@@ -15,7 +15,7 @@ export function requireAuth() {
       const user = await USUARIOS.findByPk(payload.sub, {
         attributes: [
           "ID_USU", "USR_USU", "COR_USU", "NOM_USU", "APE_USU",
-          "ID_ROL", "EST_USU", "AVA_USU", "TEL_USU", "ID_PERSONA"
+          "ID_ROL", "EST_USU", "AVA_USU", "TEL_USU", "ID_PERSONA", "COR_VER_USU"
         ],
       });
       if (!user) return res.status(401).json({ error: "No autenticado" });
@@ -61,6 +61,7 @@ export function requireAuth() {
         APE_USU: user.APE_USU,
         AVA_USU: user.AVA_USU || null,
         USR_USU: user.USR_USU || "-",
+        COR_VER_USU: !!user.COR_VER_USU,
         TEL_USU: telefono,
         CEDULA: cedula,
         ID_PERSONA: cedula,
@@ -90,7 +91,7 @@ export function optionalAuth() {
       const user = await USUARIOS.findByPk(payload.sub, {
         attributes: [
           "ID_USU", "USR_USU", "COR_USU", "NOM_USU", "APE_USU",
-          "ID_ROL", "EST_USU", "AVA_USU", "TEL_USU", "ID_PERSONA"
+          "ID_ROL", "EST_USU", "AVA_USU", "TEL_USU", "ID_PERSONA", "COR_VER_USU"
         ],
       });
       if (!user || user.EST_USU === "INACTIVO") {
@@ -108,6 +109,7 @@ export function optionalAuth() {
         APE_USU: user.APE_USU,
         AVA_USU: user.AVA_USU || null,
         USR_USU: user.USR_USU || "-",
+        COR_VER_USU: !!user.COR_VER_USU,
         TEL_USU: user.TEL_USU || "",
         CEDULA: user.ID_PERSONA || "",
         ID_PERSONA: user.ID_PERSONA || "",

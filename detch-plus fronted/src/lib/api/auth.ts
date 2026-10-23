@@ -108,4 +108,28 @@ export async function verifyEmailApi(token: string) {
     throw new Error(msg);
   }
   return json as { message: string; user?: any };
+}
+
+// Reenviar correo de verificación
+export async function resendVerificationApi(email?: string) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+  const res = await fetch(`${API}/auth/resend-verification`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ email: email ? email.trim() : undefined }),
+  });
+  const text = await res.text();
+  let json: any = null;
+  try { json = text ? JSON.parse(text) : null; } catch {}
+  if (!res.ok) {
+    const msg =
+      (json?.error && typeof json.error === "string" && json.error) ||
+      (json?.message && typeof json.message === "string" && json.message) ||
+      text || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return json as { message: string; emailPreview?: string };
 }

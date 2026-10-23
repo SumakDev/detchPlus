@@ -30,9 +30,13 @@ export type Producto = {
 
   // Derivados/relaciones
   NOMBRE: string;
+  PRECIO_VENTA?: number;
+  STOCK_DISPONIBLE?: number;
   categoria?: CategoriaRef;
   marca?: MarcaRef;
   modelo?: ModeloRef;
+  precios?: Array<{ TIP_PRE: string; VAL_PRE: number }>;
+  stock?: { CAN_DIS_STO: number; CAN_RES_STO: number; STO_MIN: number; STO_MAX: number };
 };
 
 // Datos del formulario (antes de convertir a FormData)
@@ -48,6 +52,7 @@ export type ProductoFormData = {
   ORG_PRO: OrigenProducto;
   EST_PRO: EstadoProducto;
 
+  PRECIO_VENTA?: number | string;
   ACT_PRO: boolean;
 
   imageFile?: File | null;
