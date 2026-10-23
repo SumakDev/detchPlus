@@ -6,6 +6,7 @@ function toUi(row) {
   const plain = row.get ? row.get({ plain: true }) : row;
   const cli = plain.cliente || {};
   const tec = plain.tecnico || {};
+  const det = plain.detalle || {};
   const clienteNombre = [cli.NOM_CLI, cli.APE_CLI].filter(Boolean).join(" ").trim();
   return {
     ...plain,
@@ -21,6 +22,18 @@ function toUi(row) {
       NOM_TEC: tec.NOM_TEC,
       TEL_TEC: tec.TEL_TEC,
       EST_TEC: tec.EST_TEC,
+    },
+    detalle: {
+      ID_DET_SER: det.ID_DET_SER,
+      NUM_SER: det.NUM_SER,
+      MAR_TEL_SER: det.MAR_TEL_SER || "",
+      MOD_TEL_SER: det.MOD_TEL_SER || "",
+      IME_TEL_SER: det.IME_TEL_SER || "",
+      CAP_TEL_SER: det.CAP_TEL_SER || "",
+      PROB_REP_SER: det.PROB_REP_SER || "",
+      DES_REP_TEL_SER: det.DES_REP_TEL_SER || "",
+      SOL_APL_SER: det.SOL_APL_SER || "",
+      DIR_SER: det.DIR_SER || "",
     },
   };
 }
@@ -58,6 +71,11 @@ export async function getAll(req, res) {
                 ],
               }
             : undefined,
+        },
+        {
+          model: DET_SER,
+          as: "detalle",
+          required: false,
         },
       ],
       order: [
@@ -136,10 +154,24 @@ export async function create(req, res) {
         : "RECIBIDO",
     });
 
+    // Guardar detalles del dispositivo y problema en DET_SER
+    await DET_SER.create({
+      NUM_SER: created.NUM_SER,
+      MAR_TEL_SER: body.MAR_TEL_SER || body.detalle?.MAR_TEL_SER || null,
+      MOD_TEL_SER: body.MOD_TEL_SER || body.detalle?.MOD_TEL_SER || null,
+      IME_TEL_SER: body.IME_TEL_SER || body.detalle?.IME_TEL_SER || null,
+      CAP_TEL_SER: body.CAP_TEL_SER || body.detalle?.CAP_TEL_SER || null,
+      PROB_REP_SER: body.PROB_REP_SER || body.detalle?.PROB_REP_SER || null,
+      DES_REP_TEL_SER: body.DES_REP_TEL_SER || body.detalle?.DES_REP_TEL_SER || null,
+      SOL_APL_SER: body.SOL_APL_SER || body.detalle?.SOL_APL_SER || null,
+      DIR_SER: body.DIR_SER || body.detalle?.DIR_SER || null,
+    });
+
     const withInclude = await SER_TEC.findByPk(created.NUM_SER, {
       include: [
         { model: TECNICOS, as: "tecnico", attributes: ["ID_TEC", "NOM_TEC", "TEL_TEC", "EST_TEC"] },
         { model: CLIENTES, as: "cliente", attributes: ["CED_CLI", "NOM_CLI", "APE_CLI", "NUM_CLI"] },
+        { model: DET_SER, as: "detalle" },
       ],
     });
 
@@ -150,7 +182,7 @@ export async function create(req, res) {
   }
 }
 
-// Actualizar servicio (datos generales)
+// Actualizar servicio (datos generales y detalle)
 export async function update(req, res) {
   try {
     const { num } = req.params;
@@ -191,10 +223,31 @@ export async function update(req, res) {
 
     await row.update(patch);
 
+    // Actualizar o crear detalle en DET_SER
+    const detFields = [
+      "MAR_TEL_SER", "MOD_TEL_SER", "IME_TEL_SER", "CAP_TEL_SER",
+      "PROB_REP_SER", "DES_REP_TEL_SER", "SOL_APL_SER", "DIR_SER"
+    ];
+    const hasDetUpdate = detFields.some(f => body[f] !== undefined || body.detalle?.[f] !== undefined);
+    if (hasDetUpdate) {
+      const existingDet = await DET_SER.findOne({ where: { NUM_SER: num } });
+      const detPatch = {};
+      for (const f of detFields) {
+        if (body[f] !== undefined) detPatch[f] = body[f];
+        else if (body.detalle?.[f] !== undefined) detPatch[f] = body.detalle[f];
+      }
+      if (existingDet) {
+        await existingDet.update(detPatch);
+      } else {
+        await DET_SER.create({ NUM_SER: Number(num), ...detPatch });
+      }
+    }
+
     const withInclude = await SER_TEC.findByPk(num, {
       include: [
         { model: TECNICOS, as: "tecnico", attributes: ["ID_TEC", "NOM_TEC", "TEL_TEC", "EST_TEC"] },
         { model: CLIENTES, as: "cliente", attributes: ["CED_CLI", "NOM_CLI", "APE_CLI", "NUM_CLI"] },
+        { model: DET_SER, as: "detalle" },
       ],
     });
 

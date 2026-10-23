@@ -5,8 +5,16 @@ export async function getAll(req, res) {
   try {
     const { q, act } = req.query;
     const where = {};
-    if (act === "true") where.EST_TEC = true;
-    if (act === "false") where.EST_TEC = false;
+    if (act === "true") {
+      where.EST_TEC = true;
+    } else if (act === "false") {
+      where.EST_TEC = false;
+    } else if (act === "all" || act === "") {
+      // Si se solicita explícitamente "all" o "", no filtrar por estado
+    } else {
+      // Por defecto solo técnicos activos (no eliminados lógicamente)
+      where.EST_TEC = true;
+    }
     if (q) {
       where[Op.or] = [
         { NOM_TEC: { [Op.like]: `%${q}%` } },
@@ -65,8 +73,11 @@ export async function patchEstado(req, res) {
 
 export async function remove(req, res) {
   try {
-    const deleted = await TECNICOS.destroy({ where: { ID_TEC: req.params.id } });
-    return deleted ? res.json({ message: "Eliminado correctamente" }) : res.status(404).json({ error: "No encontrado" });
+    const row = await TECNICOS.findByPk(req.params.id);
+    if (!row) return res.status(404).json({ error: "No encontrado" });
+    // Eliminado lógico: se marca como inactivo (false) para que no figure en el sistema
+    await row.update({ EST_TEC: false });
+    return res.json({ message: "Técnico eliminado correctamente", ID_TEC: row.ID_TEC });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

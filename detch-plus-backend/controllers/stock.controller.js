@@ -262,12 +262,36 @@ export async function salidaDesdeReserva(req, res) {
   }
 }
 
+// Memoria caché para deduplicación de ajustes de stock por doble clic o ráfagas rápidas (< 3 segundos)
+const recentStockAdjustments = new Map();
+
+function cleanOldAdjustments() {
+  const nowMs = Date.now();
+  for (const [key, item] of recentStockAdjustments.entries()) {
+    if (nowMs - item.time > 5000) {
+      recentStockAdjustments.delete(key);
+    }
+  }
+}
+
 // POST /stock/ajustar (ajuste libre sobre disponible; delta puede ser negativo)
 export async function ajustarDisponible(req, res) {
   try {
     const { idPro, delta, motivo, numDoc, cedEmp } = req.body || {};
     const d = toInt(delta);
     ensure(idPro && d !== 0, "idPro y delta (≠ 0) son obligatorios");
+
+    // Detección y bloqueo de doble click accidental (idempotencia en ventana de 2.5s)
+    cleanOldAdjustments();
+    const dedupKey = `${idPro}_${d}_${motivo || ""}_${numDoc || ""}`;
+    const nowMs = Date.now();
+    const lastOp = recentStockAdjustments.get(dedupKey);
+    if (lastOp && (nowMs - lastOp.time < 2500)) {
+      console.warn(`[Anti-Doble-Click] Ajuste de stock duplicado bloqueado para producto ID ${idPro} (delta ${d})`);
+      const currentStock = await STOCK.findByPk(idPro);
+      return res.json(currentStock);
+    }
+    recentStockAdjustments.set(dedupKey, { time: nowMs });
 
     const row = await withTx(async (t) => {
       const s = await STOCK.findByPk(idPro, { transaction: t, lock: t.LOCK.UPDATE });

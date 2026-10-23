@@ -155,3 +155,125 @@ export async function sendPasswordResetEmail(to, name, token) {
     return { success: false, error: err.message };
   }
 }
+
+export async function sendOrderReceiptEmail({ to, name, order, items = [], shippingAddress = {} }) {
+  try {
+    if (!to) return { success: false, error: "Email no proporcionado" };
+    const receiptUrl = `${WEB_ORIGIN}/recibo/${order.NUM_PED_ONL}`;
+
+    const itemsRows = items.map((it) => {
+      const cant = Number(it.CAN_PED_ONL || it.cantidad || 1);
+      const precio = Number(it.PRE_UNI_PED_ONL || it.precio || 0).toFixed(2);
+      const total = Number(it.PRE_TOT_PED_ONL || cant * Number(precio)).toFixed(2);
+      const desc = it.producto?.DES_PRO || it.DES_PRO || it.nombre || `Producto #${it.ID_PRO || it.id}`;
+      return `
+        <tr>
+          <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; color: #111827; font-size: 14px;">
+            ${desc}
+          </td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; color: #4b5563; font-size: 14px; text-align: center;">
+            ${cant}
+          </td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; color: #4b5563; font-size: 14px; text-align: right;">
+            $${precio}
+          </td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6; color: #111827; font-weight: 600; font-size: 14px; text-align: right;">
+            $${total}
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    const dirTexto = [
+      shippingAddress.DIR_LIN1_USU || shippingAddress.direccion,
+      shippingAddress.CIU_USU || shippingAddress.ciudad,
+      shippingAddress.PROV_USU || shippingAddress.provincia,
+      "Ecuador",
+    ].filter(Boolean).join(", ");
+
+    const { messageId, previewUrl } = await sendMail({
+      from: process.env.SMTP_FROM || '"DetchPlus Pedidos" <pedidos@detchplus.plus>',
+      to,
+      subject: `Recibo de Compra #${order.NUM_PED_ONL} — DetchPlus`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; padding: 30px; background-color: #ffffff; border-radius: 12px; border: 1px solid #e5e7eb;">
+          <div style="text-align: center; margin-bottom: 25px; padding-bottom: 20px; border-bottom: 1px solid #f3f4f6;">
+            <h1 style="color: #111827; font-size: 26px; margin: 0; font-weight: 700;">DetchPlus</h1>
+            <p style="color: #10b981; font-weight: 600; font-size: 14px; margin-top: 4px;">✓ ¡Gracias por tu compra, ${name || "Cliente"}!</p>
+          </div>
+
+          <div style="background-color: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 25px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+              <tr>
+                <td style="color: #6b7280; padding: 4px 0;">Número de Pedido:</td>
+                <td style="color: #111827; font-weight: 700; font-family: monospace; text-align: right;">${order.NUM_PED_ONL}</td>
+              </tr>
+              <tr>
+                <td style="color: #6b7280; padding: 4px 0;">Código de Rastreo:</td>
+                <td style="color: #2563eb; font-weight: 600; font-family: monospace; text-align: right;">${order.COD_SEG_PED || "—"}</td>
+              </tr>
+              <tr>
+                <td style="color: #6b7280; padding: 4px 0;">Método de Pago:</td>
+                <td style="color: #111827; font-weight: 500; text-align: right;">${order.MET_PAG_PED || "EFECTIVO"}</td>
+              </tr>
+              <tr>
+                <td style="color: #6b7280; padding: 4px 0;">Dirección de Entrega:</td>
+                <td style="color: #111827; font-weight: 500; text-align: right;">${dirTexto || "Entrega acordada"}</td>
+              </tr>
+            </table>
+          </div>
+
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+              <tr style="border-bottom: 2px solid #e5e7eb; font-size: 12px; color: #6b7280; text-transform: uppercase;">
+                <th style="padding: 8px 0; text-align: left;">Producto</th>
+                <th style="padding: 8px 0; text-align: center;">Cant.</th>
+                <th style="padding: 8px 0; text-align: right;">Precio</th>
+                <th style="padding: 8px 0; text-align: right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsRows}
+            </tbody>
+          </table>
+
+          <div style="background-color: #f9fafb; border-radius: 8px; padding: 15px 20px; margin-bottom: 25px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+              <tr>
+                <td style="color: #6b7280; padding: 4px 0;">Subtotal:</td>
+                <td style="color: #111827; text-align: right;">$${Number(order.SUB_PED_ONL || 0).toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td style="color: #6b7280; padding: 4px 0;">IVA (15%):</td>
+                <td style="color: #111827; text-align: right;">$${Number(order.IMP_PED_ONL || 0).toFixed(2)}</td>
+              </tr>
+              <tr style="border-top: 1px solid #e5e7eb; font-size: 16px;">
+                <td style="color: #111827; font-weight: 700; padding: 8px 0 0 0;">Total Pagado:</td>
+                <td style="color: #111827; font-weight: 700; text-align: right; padding: 8px 0 0 0;">$${Number(order.TOT_PED_ONL || 0).toFixed(2)}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${receiptUrl}" style="background-color: #111827; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; display: inline-block;">
+              Ver Recibo en Línea / Descargar
+            </a>
+          </div>
+
+          <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 20px;">
+            DetchPlus — Expertos en tecnología y servicio técnico Apple.<br>
+            Si tienes dudas con tu pedido contáctanos a soporte@detchplus.plus
+          </p>
+        </div>
+      `,
+    });
+
+    if (previewUrl) {
+      console.log(`🧾 [Recibo de Compra] Vista previa: ${previewUrl}`);
+    }
+    return { success: true, previewUrl, messageId };
+  } catch (err) {
+    console.error("Error enviando correo de recibo:", err);
+    return { success: false, error: err.message };
+  }
+}

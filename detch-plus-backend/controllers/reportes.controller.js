@@ -1,5 +1,7 @@
 import {
   FACTURAS,
+  DET_FAC,
+  EMPLEADOS,
   PRODUCTOS,
   CLIENTES,
   SER_TEC,
@@ -77,7 +79,15 @@ export async function getDatos(req, res) {
     const { tipo } = req.query; // "ventas", "stock", "servicios", "clientes"
     if (tipo === "ventas") {
       const facturas = await FACTURAS.findAll({
-        include: [{ model: CLIENTES, as: "cliente", attributes: ["CED_CLI", "NOM_CLI", "APE_CLI", "NUM_CLI"] }],
+        include: [
+          { model: CLIENTES, as: "cliente", attributes: ["CED_CLI", "NOM_CLI", "APE_CLI", "NUM_CLI", "COR_CLI", "DIR_CLI"] },
+          { model: EMPLEADOS, as: "empleado", attributes: ["CED_EMP", "NOM_EMP", "APE_EMP"] },
+          {
+            model: DET_FAC,
+            as: "detalles",
+            include: [{ model: PRODUCTOS, as: "producto", attributes: ["ID_PRO", "DES_PRO", "COD_BAR_PRO"] }],
+          },
+        ],
         order: [["FEC_FAC", "DESC"]],
         limit: 100,
       });

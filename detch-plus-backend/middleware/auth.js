@@ -75,6 +75,52 @@ export function requireAuth() {
   };
 }
 
+// Autenticación opcional: adjunta req.user si viene un token válido, si no continúa como invitado (null)
+export function optionalAuth() {
+  return async (req, res, next) => {
+    try {
+      const auth = req.headers.authorization || "";
+      const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+      if (!token) {
+        req.user = null;
+        return next();
+      }
+
+      const payload = jwt.verify(token, JWT_SECRET);
+      const user = await USUARIOS.findByPk(payload.sub, {
+        attributes: [
+          "ID_USU", "USR_USU", "COR_USU", "NOM_USU", "APE_USU",
+          "ID_ROL", "EST_USU", "AVA_USU", "TEL_USU", "ID_PERSONA"
+        ],
+      });
+      if (!user || user.EST_USU === "INACTIVO") {
+        req.user = null;
+        return next();
+      }
+
+      req.user = {
+        ID_USU: user.ID_USU,
+        ID_ROL: user.ID_ROL,
+        USUARIO: user.USR_USU,
+        EMAIL: user.COR_USU,
+        COR_USU: user.COR_USU,
+        NOM_USU: user.NOM_USU,
+        APE_USU: user.APE_USU,
+        AVA_USU: user.AVA_USU || null,
+        USR_USU: user.USR_USU || "-",
+        TEL_USU: user.TEL_USU || "",
+        CEDULA: user.ID_PERSONA || "",
+        ID_PERSONA: user.ID_PERSONA || "",
+      };
+      return next();
+    } catch {
+      req.user = null;
+      return next();
+    }
+  };
+}
+
+
 // Autorización: permite solo ciertos roles (lista de IDs)
 export function requireRoles(rolesPermitidos = []) {
   return (req, res, next) => {

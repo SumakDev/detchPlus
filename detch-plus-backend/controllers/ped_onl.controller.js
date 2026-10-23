@@ -1,3 +1,5 @@
+import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import {
   PED_ONL,
   DET_PED_ONL,
@@ -13,6 +15,7 @@ import {
 } from "../models/index.js";
 import sequelize from "../config/database.js";
 import { Op } from "sequelize";
+import { sendOrderReceiptEmail } from "../services/email.service.js";
 
 export async function getAll(req, res) {
   try {
@@ -55,7 +58,14 @@ export async function getAll(req, res) {
 
 export async function getOne(req, res) {
   try {
-    const data = await PED_ONL.findByPk(req.params.id, {
+    const idParam = req.params.id;
+    const isNumeric = !isNaN(Number(idParam)) && /^\d+$/.test(String(idParam).trim());
+    const where = isNumeric
+      ? { [Op.or]: [{ ID_PED_ONL: Number(idParam) }, { NUM_PED_ONL: idParam }] }
+      : { NUM_PED_ONL: idParam };
+
+    const data = await PED_ONL.findOne({
+      where,
       include: [
         {
           model: DET_PED_ONL,
@@ -73,7 +83,7 @@ export async function getOne(req, res) {
         },
       ],
     });
-    if (!data) return res.status(404).json({ error: "No encontrado" });
+    if (!data) return res.status(404).json({ error: "Pedido no encontrado" });
     return res.json(data);
   } catch (error) {
     console.error("ped_onl.getOne error:", error);
@@ -98,8 +108,81 @@ export async function create(req, res) {
       notas = "",
     } = body;
 
-    // 1. Obtener ID_USU si viene autenticado o de fallback
-    const userId = Number(req.user?.ID_USU || body.ID_USU || 1);
+    // 1. Resolver usuario: Autenticado (req.user), existente por email, o nuevo usuario invitado
+    let userId = null;
+
+    // A) Si viene autenticado mediante token JWT
+    if (req.user?.ID_USU) {
+      const authUser = await USUARIOS.findByPk(req.user.ID_USU, { transaction: t });
+      if (authUser) {
+        userId = authUser.ID_USU;
+      }
+    }
+
+    // B) Si no hay usuario autenticado, buscar por email o crear cuenta invitada
+    if (!userId) {
+      const cleanEmail = email ? String(email).trim().toLowerCase() : "";
+      if (cleanEmail) {
+        const existingUser = await USUARIOS.findOne({
+          where: { COR_USU: cleanEmail },
+          transaction: t,
+        });
+
+        if (existingUser) {
+          userId = existingUser.ID_USU;
+        } else {
+          // Crear usuario con rol CLIENTE_WEB (ID_ROL = 4)
+          const partesNombre = (nombreContacto || "Cliente Invitado").trim().split(" ");
+          const primerNombre = partesNombre[0] || "Cliente";
+          const apellido = partesNombre.slice(1).join(" ") || "DetchPlus";
+          const baseUsername = cleanEmail.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "").slice(0, 30) || "cliente";
+          const uniqueSuffix = Math.floor(1000 + Math.random() * 9000);
+          const generatedUsername = `${baseUsername}_${uniqueSuffix}`;
+
+          const randomPassword = crypto.randomBytes(16).toString("hex");
+          const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+          const newUser = await USUARIOS.create(
+            {
+              USR_USU: generatedUsername,
+              COR_USU: cleanEmail,
+              PAS_HAS_USU: hashedPassword,
+              ID_ROL: 4, // CLIENTE_WEB
+              TIPO_PERSONA: "CLIENTE",
+              ID_PERSONA: cedula ? String(cedula).trim() : "",
+              NOM_USU: primerNombre,
+              APE_USU: apellido,
+              TEL_USU: telefono ? String(telefono).trim() : null,
+              EST_USU: "ACTIVO",
+              COR_VER_USU: false,
+              ACE_TER_USU: true,
+            },
+            { transaction: t }
+          );
+
+          userId = newUser.ID_USU;
+        }
+      }
+    }
+
+    // C) Salvaguarda final: Si no hubo email, verificar si body.ID_USU existe en BD o tomar el primer usuario existente
+    if (!userId) {
+      if (body.ID_USU) {
+        const bodyUser = await USUARIOS.findByPk(Number(body.ID_USU), { transaction: t });
+        if (bodyUser) userId = bodyUser.ID_USU;
+      }
+      if (!userId) {
+        const firstUser = await USUARIOS.findOne({
+          order: [["ID_USU", "ASC"]],
+          transaction: t,
+        });
+        if (firstUser) userId = firstUser.ID_USU;
+      }
+    }
+
+    if (!userId) {
+      throw new Error("No se pudo asociar un usuario válido para registrar el pedido.");
+    }
 
     // 2. Resolver o crear dirección en DIR_USU
     let idDirEnvio = body.ID_DIR_ENV_ONL;
@@ -310,6 +393,32 @@ export async function create(req, res) {
     );
 
     await t.commit();
+
+    // Enviar recibo digital por correo al cliente de forma asíncrona
+    (async () => {
+      try {
+        let emailDestino = email ? String(email).trim() : "";
+        if (!emailDestino && userId) {
+          const u = await USUARIOS.findByPk(userId);
+          emailDestino = u?.COR_USU || "";
+        }
+        if (emailDestino) {
+          await sendOrderReceiptEmail({
+            to: emailDestino,
+            name: nombreContacto || "Cliente DetchPlus",
+            order: createdOrder,
+            items,
+            shippingAddress: {
+              direccion,
+              ciudad,
+              provincia,
+            },
+          });
+        }
+      } catch (mailErr) {
+        console.error("Error al enviar email de recibo:", mailErr.message);
+      }
+    })();
 
     return res.status(201).json({
       message: "¡Pedido y Factura creados exitosamente!",
