@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertTriangle, Trash2 } from "lucide-react";
 import TecnicosTable from "@/components/tecnicos/TecnicosTable";
 import TecnicoForm from "@/components/tecnicos/TecnicoForm";
-import { fetchTecnicos, createTecnico, updateTecnico, patchTecnicoEstado } from "@/lib/api/tecnicos";
+import { fetchTecnicos, createTecnico, updateTecnico, patchTecnicoEstado, deleteTecnico } from "@/lib/api/tecnicos";
 import type { Tecnico } from "@/types/tecnico";
 import { getMe } from "@/lib/api/auth/me";
 import Layout from "@/components/Layout";
@@ -24,6 +25,8 @@ export default function TecnicosPage() {
   const [openNew, setOpenNew] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
   const [editRow, setEditRow] = useState<Tecnico | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Tecnico | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Protección: solo roles administrativos
   useEffect(() => {
@@ -114,6 +117,7 @@ export default function TecnicosPage() {
         <TecnicosTable
           items={filtered}
           onEdit={(row) => { setEditRow(row); setOpenEdit(true); }}
+          onDelete={(row) => setDeleteTarget(row)}
           onToggleStatus={async (row) => {
             await patchTecnicoEstado(row.ID_TEC, !row.EST_TEC);
             await load();
@@ -161,6 +165,62 @@ export default function TecnicosPage() {
               }}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Eliminación Lógica con UI del Software */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="space-y-3">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <DialogTitle className="text-center text-lg font-bold text-gray-900">
+              ¿Eliminar Técnico?
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3 text-center py-2">
+            <p className="text-sm text-gray-600">
+              Estás por eliminar a <strong className="text-gray-900">{deleteTarget?.NOM_TEC}</strong> de la lista de técnicos.
+            </p>
+            <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs p-3 rounded-xl text-left flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <span>
+                <strong>Eliminación lógica:</strong> El técnico dejará de aparecer en la tienda y paneles activos, pero sus registros y órdenes de servicio se conservarán intactos en la base de datos para no quebrar el historial.
+              </span>
+            </div>
+          </div>
+
+          <div className="flex gap-2 justify-end pt-3 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              disabled={isDeleting}
+              className="rounded-lg"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!deleteTarget) return;
+                try {
+                  setIsDeleting(true);
+                  await deleteTecnico(deleteTarget.ID_TEC);
+                  setDeleteTarget(null);
+                  await load();
+                } catch (e: any) {
+                  alert(e?.message || "Error al eliminar técnico");
+                } finally {
+                  setIsDeleting(false);
+                }
+              }}
+              disabled={isDeleting}
+              className="bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-lg"
+            >
+              {isDeleting ? "Eliminando..." : "Sí, eliminar"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </main>

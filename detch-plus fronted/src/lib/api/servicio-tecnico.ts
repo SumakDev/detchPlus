@@ -19,6 +19,19 @@ async function handleJson(res: Response) {
   return json;
 }
 
+export type ServicioDetalle = {
+  ID_DET_SER?: number;
+  NUM_SER?: number;
+  MAR_TEL_SER?: string;
+  MOD_TEL_SER?: string;
+  IME_TEL_SER?: string;
+  CAP_TEL_SER?: string;
+  PROB_REP_SER?: string;
+  DES_REP_TEL_SER?: string;
+  SOL_APL_SER?: string;
+  DIR_SER?: string;
+};
+
 export type ServicioTecnico = {
   NUM_SER: number;
   ID_TEC: number;
@@ -30,6 +43,25 @@ export type ServicioTecnico = {
   EST_SER: "RECIBIDO" | "EN_PROCESO" | "TERMINADO" | "ENTREGADO";
   cliente?: { CED_CLI: string; NOM_CLI?: string; APE_CLI?: string; TEL_CLI?: string; nombreCompleto?: string };
   tecnico?: { ID_TEC: number; NOM_TEC?: string; TEL_TEC?: string; EST_TEC?: boolean };
+  detalle?: ServicioDetalle;
+};
+
+export type ServicioTecnicoInput = {
+  ID_TEC: number;
+  CED_CLI: string;
+  PRE_SER: number;
+  IVA_SER?: number;
+  PRE_VEN_SER?: number;
+  FEC_SER?: string;
+  EST_SER?: ServicioTecnico["EST_SER"];
+  MAR_TEL_SER?: string;
+  MOD_TEL_SER?: string;
+  IME_TEL_SER?: string;
+  CAP_TEL_SER?: string;
+  PROB_REP_SER?: string;
+  DES_REP_TEL_SER?: string;
+  SOL_APL_SER?: string;
+  DIR_SER?: string;
 };
 
 export async function fetchServicios(params?: { q?: string; est?: string; page?: number; limit?: number }) {
@@ -57,15 +89,7 @@ export async function fetchServTecOptions(): Promise<{
   return handleJson(res);
 }
 
-export async function createServicio(data: {
-  ID_TEC: number;
-  CED_CLI: string;
-  PRE_SER: number;
-  IVA_SER?: number;
-  PRE_VEN_SER?: number;
-  FEC_SER?: string;
-  EST_SER?: ServicioTecnico["EST_SER"];
-}) {
+export async function createServicio(data: ServicioTecnicoInput) {
   const res = await fetch(`${API}/servicios-tecnicos`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getAuthHeaders() },
@@ -74,7 +98,7 @@ export async function createServicio(data: {
   return handleJson(res) as Promise<ServicioTecnico>;
 }
 
-export async function updateServicio(num: number, patch: Partial<Omit<ServicioTecnico, "NUM_SER">>) {
+export async function updateServicio(num: number, patch: Partial<ServicioTecnicoInput>) {
   const res = await fetch(`${API}/servicios-tecnicos/${num}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...getAuthHeaders() },

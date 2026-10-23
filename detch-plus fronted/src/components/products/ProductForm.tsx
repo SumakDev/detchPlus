@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +28,7 @@ export default function ProductForm({
     DES_PRO: "",
     ORG_PRO: "COMPRA_NUEVA",
     EST_PRO: "NUEVO",
+    PRECIO_VENTA: "" as string | number,
     ACT_PRO: true,
     imageMode: "url" as "file" | "url",
     imageFile: null as File | null,
@@ -40,6 +41,9 @@ export default function ProductForm({
   const [modelos, setModelos] = useState<Array<{ ID_MOD: string; NOM_MOD: string }>>([]);
   const [existingImg, setExistingImg] = useState<string | undefined>(undefined);
   const [urlImgValid, setUrlImgValid] = useState<boolean | null>(null);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     fetchCategorias().then(setCategorias).catch(() => setCategorias([]));
@@ -67,6 +71,7 @@ export default function ProductForm({
         DES_PRO: producto.DES_PRO || "",
         ORG_PRO: producto.ORG_PRO || "COMPRA_NUEVA",
         EST_PRO: producto.EST_PRO || "NUEVO",
+        PRECIO_VENTA: producto.PRECIO_VENTA !== undefined ? producto.PRECIO_VENTA : (producto.VAL_PRE ?? ""),
         ACT_PRO: producto.ACT_PRO !== undefined ? !!producto.ACT_PRO : true,
         imageMode: isHttp ? "url" : "file",
         imageFile: null,
@@ -87,35 +92,66 @@ export default function ProductForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const fd = new FormData();
-    if (form.COD_BAR_PRO) fd.append("COD_BAR_PRO", form.COD_BAR_PRO);
-    if (form.IME_PRO) fd.append("IME_PRO", form.IME_PRO);
-    fd.append("ID_CAT", String(form.ID_CAT));
-    fd.append("ID_MAR", String(form.ID_MAR));
-    if (form.ID_MOD) fd.append("ID_MOD", String(form.ID_MOD));
-    if (form.DES_PRO) fd.append("DES_PRO", form.DES_PRO);
-    fd.append("ORG_PRO", form.ORG_PRO);
-    fd.append("EST_PRO", form.EST_PRO);
-    fd.append("ACT_PRO", String(!!form.ACT_PRO));
+    if (submittingRef.current || isSubmitting) return;
 
-    // Lógica híbrida para la imagen
-    if (form.removeImage) {
-      fd.append("removeImage", "true");
-    } else if (form.imageMode === "file" && form.imageFile) {
-      fd.append("image", form.imageFile);
-    } else if (form.imageMode === "url" && form.imageUrl.trim()) {
-      fd.append("IMG_URL", form.imageUrl.trim());
+    try {
+      submittingRef.current = true;
+      setIsSubmitting(true);
+
+      const fd = new FormData();
+      if (form.COD_BAR_PRO) fd.append("COD_BAR_PRO", form.COD_BAR_PRO);
+      if (form.IME_PRO) fd.append("IME_PRO", form.IME_PRO);
+      fd.append("ID_CAT", String(form.ID_CAT));
+      fd.append("ID_MAR", String(form.ID_MAR));
+      if (form.ID_MOD) fd.append("ID_MOD", String(form.ID_MOD));
+      if (form.DES_PRO) fd.append("DES_PRO", form.DES_PRO);
+      fd.append("ORG_PRO", form.ORG_PRO);
+      fd.append("EST_PRO", form.EST_PRO);
+      if (form.PRECIO_VENTA !== "" && form.PRECIO_VENTA !== undefined) {
+        fd.append("PRECIO_VENTA", String(form.PRECIO_VENTA));
+      }
+      fd.append("ACT_PRO", String(!!form.ACT_PRO));
+
+      // Lógica híbrida para la imagen
+      if (form.removeImage) {
+        fd.append("removeImage", "true");
+      } else if (form.imageMode === "file" && form.imageFile) {
+        fd.append("image", form.imageFile);
+      } else if (form.imageMode === "url" && form.imageUrl.trim()) {
+        fd.append("IMG_URL", form.imageUrl.trim());
+      }
+
+      await onSubmit(fd);
+    } finally {
+      setIsSubmitting(false);
+      submittingRef.current = false;
     }
-
-    await onSubmit(fd);
   }
 
   return (
     <form onSubmit={submit} className="bg-white border rounded-lg p-4 space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <div className="grid gap-2">
           <Label htmlFor="COD_BAR_PRO">Código/Barcode</Label>
           <Input id="COD_BAR_PRO" name="COD_BAR_PRO" value={form.COD_BAR_PRO} onChange={handleChange} placeholder="COD-123" />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="PRECIO_VENTA" className="text-emerald-700 font-semibold flex items-center gap-1">
+            <span>Precio Venta ($)</span>
+            <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="PRECIO_VENTA"
+            name="PRECIO_VENTA"
+            type="number"
+            step="0.01"
+            min="0"
+            value={form.PRECIO_VENTA}
+            onChange={handleChange}
+            placeholder="0.00"
+            className="font-bold border-emerald-300 focus:border-emerald-500 text-emerald-900 bg-emerald-50/20"
+            required
+          />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="IME_PRO">IMEI (opcional)</Label>
@@ -332,12 +368,22 @@ export default function ProductForm({
 
       <div className="flex items-center gap-4 pt-2">
         <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-          <input type="checkbox" name="ACT_PRO" checked={!!form.ACT_PRO} onChange={handleChange} />
+          <input type="checkbox" name="ACT_PRO" checked={!!form.ACT_PRO} onChange={handleChange} disabled={isSubmitting} />
           Activo
         </label>
         <div className="grow" />
-        <Button variant="outline" type="button" onClick={onCancel}>Cancelar</Button>
-        <Button type="submit">{isEditing ? "Guardar cambios" : "Crear producto"}</Button>
+        <Button variant="outline" type="button" disabled={isSubmitting} onClick={onCancel}>
+          Cancelar
+        </Button>
+        <Button
+          type="submit"
+          disabled={isSubmitting}
+          className="bg-gray-900 text-white hover:bg-gray-800 font-semibold transition"
+        >
+          {isSubmitting
+            ? (isEditing ? "Guardando cambios..." : "Creando producto...")
+            : (isEditing ? "Guardar cambios" : "Crear producto")}
+        </Button>
       </div>
     </form>
   );

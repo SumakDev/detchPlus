@@ -46,6 +46,7 @@ export default function Layout({ children }: LayoutProps) {
     { name: "Servicio Técnico", href: "/servicio-tecnico", icon: Settings },
     { name: "Técnicos", href: "/tecnicos", icon: UserCog },
     { name: "Usuarios", href: "/usuarios", icon: UserSquare },
+    
   ];
 
 

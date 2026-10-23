@@ -59,3 +59,11 @@ export async function patchTecnicoEstado(id: number, activo: boolean) {
   });
   return handleJson(res) as Promise<{ message: string; EST_TEC: boolean }>;
 }
+
+export async function deleteTecnico(id: number) {
+  const res = await fetch(`${API}/tecnicos/${id}`, {
+    method: "DELETE",
+    headers: { ...getAuthHeaders() },
+  });
+  return handleJson(res) as Promise<{ message: string }>;
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -412,18 +413,27 @@ export default function VentasPage() {
                           </span>
                         </td>
                         <td className="p-3 text-right">
-                          <select
-                            disabled={updatingOrderId === p.ID_PED_ONL}
-                            value={p.EST_PED_ONL}
-                            onChange={(e) => handleStatusChange(p.ID_PED_ONL, e.target.value)}
-                            className="text-xs border rounded-lg px-2 py-1 bg-white hover:border-gray-400 font-medium cursor-pointer"
-                          >
-                            <option value="PENDIENTE">PENDIENTE</option>
-                            <option value="CONFIRMADO">CONFIRMADO</option>
-                            <option value="ENVIADO">ENVIADO</option>
-                            <option value="ENTREGADO">ENTREGADO</option>
-                            <option value="CANCELADO">CANCELADO</option>
-                          </select>
+                          <div className="flex items-center justify-end gap-2">
+                            <Link
+                              href={`/recibo/${p.NUM_PED_ONL}`}
+                              target="_blank"
+                              className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 hover:bg-gray-100 text-gray-700 font-semibold transition shrink-0"
+                            >
+                              Ver Recibo
+                            </Link>
+                            <select
+                              disabled={updatingOrderId === p.ID_PED_ONL}
+                              value={p.EST_PED_ONL}
+                              onChange={(e) => handleStatusChange(p.ID_PED_ONL, e.target.value)}
+                              className="text-xs border rounded-lg px-2 py-1 bg-white hover:border-gray-400 font-medium cursor-pointer"
+                            >
+                              <option value="PENDIENTE">PENDIENTE</option>
+                              <option value="CONFIRMADO">CONFIRMADO</option>
+                              <option value="ENVIADO">ENVIADO</option>
+                              <option value="ENTREGADO">ENTREGADO</option>
+                              <option value="CANCELADO">CANCELADO</option>
+                            </select>
+                          </div>
                         </td>
                       </tr>
                     );

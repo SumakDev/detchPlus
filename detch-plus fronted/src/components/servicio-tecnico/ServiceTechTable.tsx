@@ -20,6 +20,7 @@ export default function ServiceTechTable({
             <th className="p-3">Orden #</th>
             <th className="p-3">Fecha</th>
             <th className="p-3">Cliente</th>
+            <th className="p-3">Dispositivo / Falla</th>
             <th className="p-3">Técnico</th>
             <th className="p-3">Base</th>
             <th className="p-3">IVA (15%)</th>
@@ -31,7 +32,7 @@ export default function ServiceTechTable({
         <tbody className="divide-y">
           {items.length === 0 && (
             <tr>
-              <td colSpan={9} className="p-8 text-center text-gray-500">
+              <td colSpan={10} className="p-8 text-center text-gray-500">
                 No hay órdenes de servicio técnico registradas.
               </td>
             </tr>
@@ -46,6 +47,23 @@ export default function ServiceTechTable({
                     {r.cliente?.nombreCompleto || r.CED_CLI}
                   </span>
                   <span className="text-xs text-gray-500">{r.CED_CLI}</span>
+                </div>
+              </td>
+              <td className="p-3">
+                <div className="flex flex-col max-w-[200px]">
+                  <span className="font-semibold text-gray-900 truncate">
+                    {[r.detalle?.MAR_TEL_SER, r.detalle?.MOD_TEL_SER].filter(Boolean).join(" ") || "Equipo genérico"}
+                  </span>
+                  {r.detalle?.IME_TEL_SER && (
+                    <span className="text-[10px] text-gray-400 font-mono">IMEI: {r.detalle.IME_TEL_SER}</span>
+                  )}
+                  {r.detalle?.PROB_REP_SER ? (
+                    <span className="text-xs text-amber-700 font-medium truncate" title={r.detalle.PROB_REP_SER}>
+                      ⚠ {r.detalle.PROB_REP_SER}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-400 italic">Sin falla descrita</span>
+                  )}
                 </div>
               </td>
               <td className="p-3 text-gray-800">{r.tecnico?.NOM_TEC || `Técnico #${r.ID_TEC}`}</td>

@@ -6,6 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ProductTable from "@/components/products/ProductTable";
 import ProductUpsertDialog from "@/components/products/ProductUpsertDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import type { Producto, ProductoFormData } from "@/types/product";
 import {
   fetchProductos,
@@ -13,7 +21,7 @@ import {
   updateProducto,
   deleteProducto,
 } from "@/lib/api/products";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 export default function ProductosPage() {
   const [items, setItems] = useState<Producto[]>([]);
@@ -23,6 +31,8 @@ export default function ProductosPage() {
 
   const [openUpsert, setOpenUpsert] = useState(false);
   const [editing, setEditing] = useState<Producto | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Producto | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function load() {
     try {
@@ -53,37 +63,16 @@ export default function ProductosPage() {
     });
   }, [items, q]);
 
-  function toFormData(data: ProductoFormData): FormData {
-    const fd = new FormData();
-    if (data.COD_BAR_PRO) fd.append("COD_BAR_PRO", data.COD_BAR_PRO);
-    if (data.IME_PRO) fd.append("IME_PRO", data.IME_PRO);
-    fd.append("ID_CAT", String(data.ID_CAT));
-    fd.append("ID_MAR", String(data.ID_MAR));
-    if (data.ID_MOD) fd.append("ID_MOD", String(data.ID_MOD));
-    if (data.DES_PRO) fd.append("DES_PRO", data.DES_PRO);
-    fd.append("ORG_PRO", data.ORG_PRO);
-    fd.append("EST_PRO", data.EST_PRO);
-    fd.append("ACT_PRO", String(!!data.ACT_PRO));
-    if (data.imageFile) fd.append("image", data.imageFile);
-    return fd;
+  async function handleCreate(fd: FormData) {
+    const created = await createProducto(fd);
+    setItems((prev) => [created, ...prev]);
   }
 
- async function handleCreate(fd: FormData) {
-  const created = await createProducto(fd);
-  setItems((prev) => [created, ...prev]);
-}
-
-async function handleUpdate(fd: FormData) {
-  if (!editing) return;
-  const updated = await updateProducto(editing.ID_PRO, fd);
-  setItems((prev) => prev.map((x) => (x.ID_PRO === updated.ID_PRO ? updated : x)));
-  setEditing(null);
-}
-
-  async function handleDelete(id: string) {
-    if (!confirm("¿Eliminar este producto?")) return;
-    await deleteProducto(id);
-    setItems((prev) => prev.filter((x) => x.ID_PRO !== id));
+  async function handleUpdate(fd: FormData) {
+    if (!editing) return;
+    const updated = await updateProducto(editing.ID_PRO, fd);
+    setItems((prev) => prev.map((x) => (x.ID_PRO === updated.ID_PRO ? updated : x)));
+    setEditing(null);
   }
 
   return (
@@ -137,10 +126,11 @@ async function handleUpdate(fd: FormData) {
               setEditing(p);
               setOpenUpsert(true);
             }}
-            onDelete={handleDelete}
+            onDelete={(p) => setDeleteTarget(p)}
           />
         )}
 
+        {/* Modal Crear / Editar Producto */}
         <ProductUpsertDialog
           open={openUpsert}
           onOpenChange={(o) => {
@@ -151,6 +141,83 @@ async function handleUpdate(fd: FormData) {
           isEditing={!!editing}
           onSubmit={editing ? handleUpdate : handleCreate}
         />
+
+        {/* Modal de Eliminación Lógica con diseño del sistema */}
+        <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && !deleting && setDeleteTarget(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader className="space-y-3">
+              <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <DialogTitle className="text-center text-lg font-bold text-gray-900">
+                ¿Eliminar Producto?
+              </DialogTitle>
+              <DialogDescription className="text-center text-xs text-gray-500 leading-relaxed">
+                Esta acción realizará una <strong className="text-gray-700">eliminación lógica</strong> del producto{" "}
+                <strong className="text-gray-900 font-semibold">{deleteTarget?.NOMBRE || `Producto #${deleteTarget?.ID_PRO}`}</strong>.
+                El registro se conservará en la base de datos para garantizar la integridad histórica de ventas, facturas y movimientos de stock, pero ya no aparecerá activo en el catálogo ni en el sistema.
+              </DialogDescription>
+            </DialogHeader>
+
+            {deleteTarget && (
+              <div className="bg-gray-50 rounded-xl p-3 border border-gray-200 text-xs space-y-1.5 text-gray-700">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Código de Barras:</span>
+                  <span className="font-mono font-medium">{deleteTarget.COD_BAR_PRO || "Sin código"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Marca / Modelo:</span>
+                  <span>{[deleteTarget.marca?.NOM_MAR, deleteTarget.modelo?.NOM_MOD].filter(Boolean).join(" • ") || "—"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Precio de Venta:</span>
+                  <span className="font-bold text-emerald-700 font-mono">${Number(deleteTarget.PRECIO_VENTA || 0).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 space-y-1">
+              <p className="font-semibold text-amber-950 flex items-center gap-1.5">
+                <span>⚠</span> Consistencia de datos:
+              </p>
+              <p>
+                El historial de facturas, pedidos y movimientos previos conservará la referencia del producto sin violar restricciones de clave foránea.
+              </p>
+            </div>
+
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={deleting}
+                onClick={() => setDeleteTarget(null)}
+                className="w-full sm:w-auto"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                disabled={deleting}
+                onClick={async () => {
+                  if (!deleteTarget) return;
+                  try {
+                    setDeleting(true);
+                    await deleteProducto(deleteTarget.ID_PRO);
+                    setItems((prev) => prev.filter((x) => x.ID_PRO !== deleteTarget.ID_PRO));
+                    setDeleteTarget(null);
+                  } catch (err: any) {
+                    alert(err?.message || "Error al eliminar producto");
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+                className="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white font-semibold shadow-sm"
+              >
+                {deleting ? "Eliminando..." : "Sí, eliminar producto"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

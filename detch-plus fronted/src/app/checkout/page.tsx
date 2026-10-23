@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
@@ -59,6 +59,7 @@ export default function CheckoutPage() {
   const [notas, setNotas] = useState("");
 
   const [loading, setLoading] = useState(false);
+  const loadingRef = useRef(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [completedOrder, setCompletedOrder] = useState<any | null>(null);
 
@@ -112,6 +113,9 @@ export default function CheckoutPage() {
     e.preventDefault();
     setErrorMsg(null);
 
+    // Protección estricta contra doble click al comprar
+    if (loadingRef.current || loading) return;
+
     if (items.length === 0) {
       setErrorMsg("Tu carrito está vacío. Agrega productos antes de continuar.");
       return;
@@ -127,11 +131,12 @@ export default function CheckoutPage() {
       return;
     }
 
+    loadingRef.current = true;
     setLoading(true);
 
     try {
       const payload = {
-        ID_USU: auth.user?.ID_USU || 1,
+        ID_USU: auth.user?.ID_USU || undefined,
         nombreContacto: nombres,
         email,
         cedula,
@@ -168,6 +173,7 @@ export default function CheckoutPage() {
       setErrorMsg(err?.message || "Ocurrió un error al procesar tu compra.");
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   }
 
@@ -221,9 +227,18 @@ export default function CheckoutPage() {
           )}
 
           <div className="pt-4 flex flex-col sm:flex-row gap-3 justify-center">
+            {orderData.NUM_PED_ONL && (
+              <Button
+                onClick={() => router.push(`/recibo/${orderData.NUM_PED_ONL}`)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-semibold shadow-sm transition"
+              >
+                Ver / Imprimir Recibo
+              </Button>
+            )}
             <Button
               onClick={() => router.push("/")}
-              className="bg-gray-900 text-white px-8 py-3 rounded-xl font-semibold hover:bg-gray-800 transition"
+              variant="outline"
+              className="px-6 py-3 rounded-xl font-semibold hover:bg-gray-100 transition"
             >
               Volver a la Tienda
             </Button>
@@ -471,7 +486,7 @@ export default function CheckoutPage() {
                 Método de Pago
               </h2>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label
                   className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition text-center ${
                     metodoPago === "EFECTIVO"
@@ -512,7 +527,7 @@ export default function CheckoutPage() {
                   <span className="text-[11px] text-gray-400 mt-1">Pichincha / Guayaquil</span>
                 </label>
 
-                <label
+                {/* <label
                   className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition text-center ${
                     metodoPago === "TARJ_CRED"
                       ? "border-gray-900 bg-gray-50 text-gray-900 font-semibold"
@@ -530,7 +545,7 @@ export default function CheckoutPage() {
                   <CreditCard className="w-6 h-6 mb-2 text-purple-600" />
                   <span className="text-sm">Tarjeta Crédito / Débito</span>
                   <span className="text-[11px] text-gray-400 mt-1">Datafast / Pos</span>
-                </label>
+                </label> */}
               </div>
 
               <div>

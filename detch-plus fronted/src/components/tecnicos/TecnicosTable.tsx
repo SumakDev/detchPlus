@@ -7,10 +7,12 @@ export default function TecnicosTable({
   items,
   onEdit,
   onToggleStatus,
+  onDelete,
 }: {
   items: Tecnico[];
   onEdit: (row: Tecnico) => void;
   onToggleStatus: (row: Tecnico) => void;
+  onDelete: (row: Tecnico) => void;
 }) {
   return (
     <div className="overflow-x-auto rounded-lg border bg-white">
@@ -44,6 +46,7 @@ export default function TecnicosTable({
               </td>
               <td className="p-3">
                 <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={() => onDelete(t)} className="text-rose-600 hover:bg-rose-50 border-rose-200">Eliminar</Button>
                   <Button variant="outline" size="sm" onClick={() => onEdit(t)}>Editar</Button>
                   <Button variant="outline" size="sm" onClick={() => onToggleStatus(t)}>
                     {t.EST_TEC ? "Desactivar" : "Activar"}

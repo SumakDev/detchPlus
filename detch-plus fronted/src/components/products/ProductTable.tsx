@@ -11,7 +11,7 @@ export default function ProductTable({
 }: {
   productos: Producto[];
   onEdit: (p: Producto) => void;
-  onDelete: (id: string) => void | Promise<void>;
+  onDelete: (p: Producto) => void | Promise<void>;
 }) {
   if (productos.length === 0) {
     return (
@@ -99,7 +99,7 @@ export default function ProductTable({
               <Button
                 variant="destructive"
                 size="sm"
-                onClick={() => onDelete(p.ID_PRO)}
+                onClick={() => onDelete(p)}
                 className="w-full text-xs h-9 font-medium"
               >
                 <Trash2 className="w-3.5 h-3.5 mr-1" /> Eliminar
@@ -174,7 +174,7 @@ export default function ProductTable({
                     <Button variant="outline" size="sm" onClick={() => onEdit(p)} className="h-8 text-xs">
                       Editar
                     </Button>
-                    <Button variant="destructive" size="sm" onClick={() => onDelete(p.ID_PRO)} className="h-8 text-xs">
+                    <Button variant="destructive" size="sm" onClick={() => onDelete(p)} className="h-8 text-xs">
                       Eliminar
                     </Button>
                   </div>

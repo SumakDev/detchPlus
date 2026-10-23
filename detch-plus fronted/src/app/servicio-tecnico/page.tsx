@@ -218,9 +218,9 @@ export default function ServicioTecnicoPage() {
 
       {/* Crear */}
       <Dialog open={openNew} onOpenChange={setOpenNew}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Nuevo servicio</DialogTitle>
+            <DialogTitle>Nueva Orden de Servicio Técnico</DialogTitle>
           </DialogHeader>
           <ServiceTechForm
             onCancel={() => setOpenNew(false)}
@@ -235,9 +235,9 @@ export default function ServicioTecnicoPage() {
 
       {/* Editar */}
       <Dialog open={openEdit} onOpenChange={setOpenEdit}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Editar servicio #{editRow?.NUM_SER}</DialogTitle>
+            <DialogTitle>Editar Servicio Técnico — OT #{editRow?.NUM_SER}</DialogTitle>
           </DialogHeader>
           {editRow && (
             <ServiceTechForm
@@ -248,6 +248,14 @@ export default function ServicioTecnicoPage() {
                 IVA_SER: editRow.IVA_SER,
                 PRE_VEN_SER: editRow.PRE_VEN_SER,
                 EST_SER: editRow.EST_SER,
+                MAR_TEL_SER: editRow.detalle?.MAR_TEL_SER || "",
+                MOD_TEL_SER: editRow.detalle?.MOD_TEL_SER || "",
+                IME_TEL_SER: editRow.detalle?.IME_TEL_SER || "",
+                CAP_TEL_SER: editRow.detalle?.CAP_TEL_SER || "",
+                PROB_REP_SER: editRow.detalle?.PROB_REP_SER || "",
+                DES_REP_TEL_SER: editRow.detalle?.DES_REP_TEL_SER || "",
+                SOL_APL_SER: editRow.detalle?.SOL_APL_SER || "",
+                DIR_SER: editRow.detalle?.DIR_SER || "",
               }}
               onCancel={() => setOpenEdit(false)}
               onSubmit={async (data) => {
