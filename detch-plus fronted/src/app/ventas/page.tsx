@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ShoppingCart, Plus, FileText, CheckCircle2, Clock } from "lucide-react";
+import { ShoppingCart, Plus, FileText, CheckCircle2, Clock, UserPlus } from "lucide-react";
+import ClientUpsertDialog from "@/components/ClientUpsertDialog";
+import { createCliente } from "@/lib/api/clients";
+import { ClienteFormData } from "@/types/client";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -68,6 +71,30 @@ export default function VentasPage() {
   const [cantidad, setCantidad] = useState(1);
   const [precioUni, setPrecioUni] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [openNewClient, setOpenNewClient] = useState(false);
+  const [clientCreatedNotice, setClientCreatedNotice] = useState<string | null>(null);
+
+  async function handleCreateClientFromVenta(data: ClienteFormData) {
+    const created = await createCliente(data);
+    setClientes((prev) => [
+      {
+        CED_CLI: created.CED_CLI,
+        NOM_CLI: created.NOM_CLI,
+        APE_CLI: created.APE_CLI,
+        DIR_CLI: created.DIR_CLI,
+        COR_CLI: created.COR_CLI,
+        NUM_CLI: created.NUM_CLI,
+        DIF_CLI: created.DIF_CLI,
+        ACT_CLI: created.ACTIVO,
+      },
+      ...prev,
+    ]);
+    setSelectedClient(created.CED_CLI);
+    setClientCreatedNotice(`${created.NOM_CLI} ${created.APE_CLI} (${created.CED_CLI})`);
+    setTimeout(() => {
+      setClientCreatedNotice(null);
+    }, 6000);
+  }
 
   async function loadData() {
     try {
@@ -452,11 +479,23 @@ export default function VentasPage() {
             </DialogHeader>
             <form onSubmit={handleCreateVenta} className="space-y-4 pt-2">
               <div>
-                <label className="text-sm font-semibold text-gray-700 block mb-1">Cliente</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-sm font-semibold text-gray-700">Cliente</label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setOpenNewClient(true)}
+                    className="h-7 text-xs flex items-center gap-1.5 text-blue-600 hover:text-blue-700 border-blue-200 hover:bg-blue-50 cursor-pointer font-medium"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                    + Nuevo Cliente
+                  </Button>
+                </div>
                 <select
                   value={selectedClient}
                   onChange={(e) => setSelectedClient(e.target.value)}
-                  className="w-full border rounded-lg p-2.5 text-sm"
+                  className="w-full border rounded-lg p-2.5 text-sm bg-white"
                   required
                 >
                   <option value="">Selecciona un cliente</option>
@@ -466,6 +505,12 @@ export default function VentasPage() {
                     </option>
                   ))}
                 </select>
+                {clientCreatedNotice && (
+                  <p className="mt-1.5 text-xs text-emerald-700 font-medium flex items-center gap-1 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-md">
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                    Cliente registrado y seleccionado: <strong>{clientCreatedNotice}</strong>
+                  </p>
+                )}
               </div>
 
               <div>
@@ -475,9 +520,12 @@ export default function VentasPage() {
                   onChange={(e) => {
                     setSelectedProduct(e.target.value);
                     const prod = productos.find((p) => String(p.ID_PRO) === e.target.value);
-                    if (prod) setPrecioUni(999); // default base o referencia
+                    if (prod) {
+                      const precio = Number(prod.PRECIO_VENTA ?? prod.PRE_PRO ?? 0);
+                      setPrecioUni(precio);
+                    }
                   }}
-                  className="w-full border rounded-lg p-2.5 text-sm"
+                  className="w-full border rounded-lg p-2.5 text-sm bg-white"
                   required
                 >
                   <option value="">Selecciona un producto</option>
@@ -539,6 +587,14 @@ export default function VentasPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Modal Registrar Cliente directamente desde Ventas */}
+        <ClientUpsertDialog
+          open={openNewClient}
+          onOpenChange={setOpenNewClient}
+          onSubmit={handleCreateClientFromVenta}
+          className="z-[60]"
+        />
       </div>
     </Layout>
   );

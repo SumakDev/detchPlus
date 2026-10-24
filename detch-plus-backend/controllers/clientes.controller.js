@@ -1,4 +1,5 @@
 import { CLIENTES } from "../models/index.js";
+import { validarClientePayload } from "../validators/clientes.validator.js";
 
 // Utilidad: normaliza payload y da default a FEC_REG_CLI si la BD lo exige
 function normalizePayload(body = {}) {
@@ -30,6 +31,16 @@ export async function getOne(req, res) {
 export async function create(req, res) {
   try {
     const payload = normalizePayload(req.body);
+
+    const validation = validarClientePayload(payload, false);
+    if (!validation.isValid) {
+      return res.status(400).json({
+        error: "Error de validación",
+        message: validation.errors[0]?.message || "Datos del cliente inválidos",
+        details: validation.errors,
+      });
+    }
+
     const created = await CLIENTES.create(payload);
     return res.status(201).json(created);
   } catch (error) {
@@ -66,6 +77,15 @@ export async function create(req, res) {
 
 export async function update(req, res) {
   try {
+    const validation = validarClientePayload(req.body, true);
+    if (!validation.isValid) {
+      return res.status(400).json({
+        error: "Error de validación",
+        message: validation.errors[0]?.message || "Datos del cliente inválidos",
+        details: validation.errors,
+      });
+    }
+
     const [updated] = await CLIENTES.update(req.body, { where: { CED_CLI: req.params.id } });
     if (!updated) return res.status(404).json({ error: "No encontrado" });
     const refreshed = await CLIENTES.findByPk(req.params.id);
@@ -82,10 +102,14 @@ export async function update(req, res) {
 
 export async function remove(req, res) {
   try {
-    const deleted = await CLIENTES.destroy({ where: { CED_CLI: req.params.id } });
-    return deleted ? res.json({ message: "Eliminado correctamente" }) : res.status(404).json({ error: "No encontrado" });
+    const row = await CLIENTES.findByPk(req.params.id);
+    if (!row) return res.status(404).json({ error: "No encontrado" });
+
+    // Eliminación lógica: marcamos como inactivo (ACT_CLI: false) para preservar la integridad referencial histórica (FACTURAS, etc.)
+    await row.update({ ACT_CLI: false });
+    return res.json({ message: "Cliente dado de baja correctamente", CED_CLI: row.CED_CLI, ACT_CLI: false });
   } catch (error) {
     console.error("CLIENTES.remove error:", error);
-    return res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error: error?.message || "Internal server error" });
   }
 }

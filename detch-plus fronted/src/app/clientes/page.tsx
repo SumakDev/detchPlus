@@ -7,7 +7,8 @@ import ClientTable from "@/components/ClientTable";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Cliente, ClienteFormData } from "@/types/client";
-import { Plus, Users, UserCheck, UserX } from "lucide-react";
+import { Plus, Users, UserCheck, UserX, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fetchClientes, createCliente, updateCliente, deleteCliente } from "@/lib/api/clients";
 
 export default function ClientesPage() {
@@ -18,6 +19,8 @@ export default function ClientesPage() {
   const [openUpsert, setOpenUpsert] = useState(false);
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
   const [viewingCliente, setViewingCliente] = useState<Cliente | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Cliente | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   async function loadClientes() {
     try {
@@ -57,10 +60,30 @@ export default function ClientesPage() {
     setEditingCliente(null);
   };
 
-  const handleDeleteCliente = async (cedula: string) => {
-    if (!confirm("¿Estás seguro de eliminar este cliente?")) return;
-    await deleteCliente(cedula);
-    setClientes((prev) => prev.filter((c) => c.CED_CLI !== cedula));
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      setIsDeleting(true);
+      await deleteCliente(deleteTarget.CED_CLI);
+      setDeleteTarget(null);
+      await loadClientes();
+    } catch (err: any) {
+      alert(err?.message || "Error al dar de baja al cliente");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleReactivateCliente = async (cliente: Cliente) => {
+    try {
+      await updateCliente(cliente.CED_CLI, {
+        ...cliente,
+        ACTIVO: true,
+      });
+      await loadClientes();
+    } catch (err: any) {
+      alert(err?.message || "Error al reactivar cliente");
+    }
   };
 
   return (
@@ -190,7 +213,8 @@ export default function ClientesPage() {
               setEditingCliente(c);
               setOpenUpsert(true);
             }}
-            onDelete={handleDeleteCliente}
+            onDelete={(c) => setDeleteTarget(c)}
+            onReactivate={handleReactivateCliente}
             onView={setViewingCliente}
           />
         )}
@@ -206,6 +230,53 @@ export default function ClientesPage() {
           cliente={editingCliente}
           onSubmit={editingCliente ? handleUpdateCliente : handleCreateCliente}
         />
+
+        {/* Modal Confirmación Eliminación Lógica */}
+        <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-rose-600">
+                <AlertTriangle className="h-5 w-5" />
+                Confirmar Baja de Cliente
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-3 py-2 text-sm text-gray-600">
+              <p>
+                ¿Estás seguro de que deseas dar de baja al cliente{" "}
+                <strong className="text-gray-900">
+                  {deleteTarget?.NOM_CLI} {deleteTarget?.APE_CLI}
+                </strong>{" "}
+                (Cédula: <span className="font-mono">{deleteTarget?.CED_CLI}</span>)?
+              </p>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900 flex gap-2 items-start">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                <span>
+                  <strong>Eliminación lógica:</strong> El cliente se marcará como <em>Inactivo</em>. No se eliminarán sus facturas ni su historial de compras para preservar la integridad referencial y contable del sistema.
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-2 justify-end pt-3 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+                className="rounded-lg"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-lg"
+              >
+                {isDeleting ? "Dando de baja..." : "Sí, dar de baja"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

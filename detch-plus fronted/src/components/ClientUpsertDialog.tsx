@@ -10,12 +10,13 @@ type Props = {
   isEditing?: boolean;
   cliente?: Cliente | null;
   onSubmit: (data: ClienteFormData) => void | Promise<void>;
+  className?: string;
 };
 
-export default function ClientUpsertDialog({ open, onOpenChange, isEditing, cliente, onSubmit }: Props) {
+export default function ClientUpsertDialog({ open, onOpenChange, isEditing, cliente, onSubmit, className }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className={`sm:max-w-lg ${className || ""}`}>
         <DialogHeader>
           <DialogTitle>{isEditing ? "Editar Cliente" : "Agregar Cliente"}</DialogTitle>
         </DialogHeader>
