@@ -219,10 +219,10 @@ export default function CheckoutPage() {
                 <Building2 className="w-4 h-4" /> Datos Bancarios para Transferencia:
               </p>
               <p>• <strong>Banco:</strong> Banco Pichincha (Cta. Corriente)</p>
-              <p>• <strong>Número:</strong> 2100458923</p>
+              <p>• <strong>Número:</strong> 2208634554</p>
               <p>• <strong>Titular:</strong> DetchPlus Soluciones Tecnológicas S.A.</p>
-              <p>• <strong>RUC:</strong> 1792837482001</p>
-              <p className="text-gray-500 italic mt-1">Por favor envía el comprobante con tu número de pedido a pagos@detchplus.com o vía WhatsApp.</p>
+              <p>• <strong>RUC:</strong> 1850630441001</p>
+              <p className="text-gray-500 italic mt-1">Por favor envía el comprobante con tu número de pedido a pagos@detchplus.com o vía WhatsApp 096 401 1577.</p>
             </div>
           )}
 

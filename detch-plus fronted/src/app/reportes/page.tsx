@@ -417,9 +417,9 @@ export default function ReportesPage() {
                       Soluciones Tecnológicas, Retail & Servicio Técnico Especializado
                     </p>
                     <div className="text-xs text-gray-600 mt-3 space-y-0.5">
-                      <p><strong>RUC:</strong> 1792345678001</p>
-                      <p><strong>Matriz:</strong> Av. Amazonas y República, Edif. Torre Norte</p>
-                      <p><strong>Teléfono:</strong> +593 99 999 9999 | <strong>Quito - Ecuador</strong></p>
+                      <p><strong>RUC:</strong> 1850630441001</p>
+                      <p><strong>Matriz:</strong> Av.cevallos y Mariano Eguez</p>
+                      <p><strong>Teléfono:</strong> +593 96 401 1577 | <strong>Ambato - Ecuador</strong></p>
                       <p><strong>Obligado a llevar contabilidad:</strong> SÍ</p>
                     </div>
                   </div>
