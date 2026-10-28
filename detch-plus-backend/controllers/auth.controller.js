@@ -2,7 +2,7 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { Op } from "sequelize";
-import { USUARIOS } from "../models/index.js";
+import { USUARIOS, SES_USU, LOG_ACT_USU } from "../models/index.js";
 import { sendVerificationEmail, sendPasswordResetEmail } from "../services/email.service.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
@@ -64,6 +64,31 @@ export async function register(req, res) {
     // Enviar correo de verificación de forma asíncrona
     const emailResult = await sendVerificationEmail(email, nombres, verifyToken);
 
+    try {
+      const ip = req.ip || req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "127.0.0.1";
+      const ua = req.headers["user-agent"] || "Browser";
+      await SES_USU.create({
+        ID_SES_USU: crypto.randomUUID(),
+        ID_USU: created.ID_USU,
+        IP_SES_USU: String(ip).slice(0, 45),
+        UA_SES_USU: ua,
+        FEC_INI_SES: new Date(),
+        FEC_ULG_SES: new Date(),
+        EXP_SES_USU: new Date(Date.now() + 7 * 24 * 3600 * 1000),
+        ACT_SES_USU: true,
+      });
+      await LOG_ACT_USU.create({
+        ID_USU: created.ID_USU,
+        ACC_LOG_ACT_USU: "REGISTRO",
+        DES_LOG_ACT_USU: `Registro de nuevo usuario: ${created.USR_USU} (${created.COR_USU})`,
+        IP_LOG_ACT_USU: String(ip).slice(0, 45),
+        UA_LOG_ACT_USU: ua,
+        FEC_LOG_ACT_USU: new Date(),
+      });
+    } catch (auditErr) {
+      console.error("Error registrando auditoría de registro:", auditErr);
+    }
+
     const token = signToken(created);
     return res.status(201).json({
       token,
@@ -106,12 +131,38 @@ export async function login(req, res) {
 
     if (user.EST_USU === "INACTIVO") return res.status(403).json({ error: "Usuario inactivo" });
 
+    const ip = req.ip || req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "127.0.0.1";
+    const ua = req.headers["user-agent"] || "Browser";
+
     await user.update({
       INT_FAL_USU: 0,
       FEC_ULG_USU: new Date(),
-      IP_ULG_USU: req.ip || req.headers["x-forwarded-for"] || req.socket.remoteAddress || null,
+      IP_ULG_USU: String(ip).slice(0, 45),
       FEC_ACT_USU: new Date(),
     });
+
+    try {
+      await SES_USU.create({
+        ID_SES_USU: crypto.randomUUID(),
+        ID_USU: user.ID_USU,
+        IP_SES_USU: String(ip).slice(0, 45),
+        UA_SES_USU: ua,
+        FEC_INI_SES: new Date(),
+        FEC_ULG_SES: new Date(),
+        EXP_SES_USU: new Date(Date.now() + 7 * 24 * 3600 * 1000),
+        ACT_SES_USU: true,
+      });
+      await LOG_ACT_USU.create({
+        ID_USU: user.ID_USU,
+        ACC_LOG_ACT_USU: "LOGIN",
+        DES_LOG_ACT_USU: `Inicio de sesión exitoso (${user.USR_USU})`,
+        IP_LOG_ACT_USU: String(ip).slice(0, 45),
+        UA_LOG_ACT_USU: ua,
+        FEC_LOG_ACT_USU: new Date(),
+      });
+    } catch (auditErr) {
+      console.error("Error registrando auditoría de login:", auditErr);
+    }
 
     const token = signToken(user);
     return res.json({ token, user: toUserResponse(user) });

@@ -233,6 +233,9 @@ export async function update(req, res) {
       }
     }
 
+    const prevDis = row.DIS_TEL || "DISPONIBLE";
+    const nextDis = body.DIS_TEL ?? row.DIS_TEL ?? "DISPONIBLE";
+
     await row.update(
       {
         IME_TEL: imei,
@@ -246,12 +249,37 @@ export async function update(req, res) {
         EST_CAM_TEL: body.EST_CAM_TEL !== undefined ? clampScore(body.EST_CAM_TEL, row.EST_CAM_TEL) : row.EST_CAM_TEL,
         EST_SOF_TEL: body.EST_SOF_TEL !== undefined ? clampScore(body.EST_SOF_TEL, row.EST_SOF_TEL) : row.EST_SOF_TEL,
         ACC_INC_TEL: body.ACC_INC_TEL !== undefined ? (body.ACC_INC_TEL ? String(body.ACC_INC_TEL).trim() : null) : row.ACC_INC_TEL,
-        DIS_TEL: body.DIS_TEL ?? row.DIS_TEL,
+        DIS_TEL: nextDis,
       },
       { transaction: t }
     );
 
     await syncPhoneStock(row.ID_PRO, t);
+
+    if (prevDis !== nextDis) {
+      if (prevDis === "DISPONIBLE" && nextDis !== "DISPONIBLE") {
+        await MOV_INV.create(
+          {
+            ID_PRO: row.ID_PRO,
+            TIP_MOV: "SALIDA",
+            CAN_MOV: 1,
+            MOT_MOV: `CAMBIO_ESTADO_TEL (${prevDis} -> ${nextDis}) ${row.COL_TEL || ""} ${row.ALM_TEL || ""} IMEI:${row.IME_TEL || "S/N"}`.trim(),
+          },
+          { transaction: t }
+        );
+      } else if (prevDis !== "DISPONIBLE" && nextDis === "DISPONIBLE") {
+        await MOV_INV.create(
+          {
+            ID_PRO: row.ID_PRO,
+            TIP_MOV: "ENTRADA",
+            CAN_MOV: 1,
+            MOT_MOV: `REINGRESO_TEL (${prevDis} -> DISPONIBLE) ${row.COL_TEL || ""} ${row.ALM_TEL || ""} IMEI:${row.IME_TEL || "S/N"}`.trim(),
+          },
+          { transaction: t }
+        );
+      }
+    }
+
     await t.commit();
     return res.json(row);
   } catch (error) {
@@ -271,8 +299,23 @@ export async function remove(req, res) {
     }
 
     const idPro = row.ID_PRO;
+    const wasDisponible = (row.DIS_TEL || "DISPONIBLE") === "DISPONIBLE";
+    const infoTel = `${row.COL_TEL || ""} ${row.ALM_TEL || ""} IMEI:${row.IME_TEL || "S/N"}`.trim();
+
     await row.destroy({ transaction: t });
     await syncPhoneStock(idPro, t);
+
+    if (wasDisponible) {
+      await MOV_INV.create(
+        {
+          ID_PRO: idPro,
+          TIP_MOV: "SALIDA",
+          CAN_MOV: 1,
+          MOT_MOV: `BAJA_UNIDAD_TEL (${infoTel})`,
+        },
+        { transaction: t }
+      );
+    }
 
     await t.commit();
     return res.json({ message: "Unidad de teléfono eliminada y stock sincronizado", ID_DET_TEL: idDet, ID_PRO: idPro });

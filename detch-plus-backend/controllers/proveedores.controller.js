@@ -2,7 +2,7 @@ import { PROVEEDORES } from "../models/index.js";
 
 export async function getAll(req, res) {
   try {
-    const data = await PROVEEDORES.findAll();
+    const data = await PROVEEDORES.findAll({ order: [["ID_PRV", "DESC"]] });
     return res.json(data);
   } catch (error) {
     return res.status(500).json({ error: error.message });

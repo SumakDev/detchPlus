@@ -1,8 +1,21 @@
-import { PAR_PAG_APL } from "../models/index.js";
+import { PAR_PAG_APL, FACTURAS, EVA_PAR_PAG, CLIENTES, PRODUCTOS } from "../models/index.js";
 
 export async function getAll(req, res) {
   try {
-    const data = await PAR_PAG_APL.findAll();
+    const data = await PAR_PAG_APL.findAll({
+      include: [
+        { model: FACTURAS, as: "factura", include: [{ model: CLIENTES, as: "cliente" }] },
+        {
+          model: EVA_PAR_PAG,
+          as: "evaluacion",
+          include: [
+            { model: CLIENTES, as: "cliente" },
+            { model: PRODUCTOS, as: "producto" },
+          ],
+        },
+      ],
+      order: [["FEC_APL_PAR", "DESC"]],
+    });
     return res.json(data);
   } catch (error) {
     return res.status(500).json({ error: error.message });

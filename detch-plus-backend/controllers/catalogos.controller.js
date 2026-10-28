@@ -1,5 +1,5 @@
 import { Op } from "sequelize";
-import { CATEGORIAS, MARCAS, MODELOS } from "../models/index.js";
+import { CATEGORIAS, MARCAS, MODELOS, PROVEEDORES } from "../models/index.js";
 
 export async function getCategorias(req, res) {
   try {
@@ -39,6 +39,21 @@ export async function getModelos(req, res) {
       where,
       order: [["NOM_MOD", "ASC"]],
       include: [{ model: MARCAS, as: "marca", attributes: ["ID_MAR", "NOM_MAR"] }],
+    });
+    return res.json(rows);
+  } catch (e) {
+    return res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+export async function getProveedores(req, res) {
+  try {
+    const { q } = req.query;
+    const where = { EST_PRV: true };
+    if (q) where.NOM_PRV = { [Op.like]: `%${q}%` };
+    const rows = await PROVEEDORES.findAll({
+      where,
+      order: [["NOM_PRV", "ASC"]],
     });
     return res.json(rows);
   } catch (e) {

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ProductTable from "@/components/products/ProductTable";
 import ProductUpsertDialog from "@/components/products/ProductUpsertDialog";
+import CatalogsSuppliersDialog from "@/components/products/CatalogsSuppliersDialog";
 import {
   Dialog,
   DialogContent,
@@ -14,14 +15,14 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import type { Producto, ProductoFormData } from "@/types/product";
+import type { Producto } from "@/types/product";
 import {
   fetchProductos,
   createProducto,
   updateProducto,
   deleteProducto,
 } from "@/lib/api/products";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Truck } from "lucide-react";
 
 export default function ProductosPage() {
   const [items, setItems] = useState<Producto[]>([]);
@@ -30,6 +31,7 @@ export default function ProductosPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [openUpsert, setOpenUpsert] = useState(false);
+  const [openCatalogs, setOpenCatalogs] = useState(false);
   const [editing, setEditing] = useState<Producto | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Producto | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -58,13 +60,14 @@ export default function ProductosPage() {
       const byNombre = (p.NOMBRE || "").toLowerCase().includes(term);
       const byCodBar = (p.COD_BAR_PRO || "").toLowerCase().includes(term);
       const byId = String(p.ID_PRO).toLowerCase().includes(term);
+      const byPrv = (p.proveedor?.NOM_PRV || "").toLowerCase().includes(term);
       const byPhoneUnit = (p.detallesTelefono || []).some(
         (d) =>
           (d.IME_TEL || "").toLowerCase().includes(term) ||
           (d.COL_TEL || "").toLowerCase().includes(term) ||
           (d.ALM_TEL || "").toLowerCase().includes(term)
       );
-      return byNombre || byCodBar || byId || byPhoneUnit;
+      return byNombre || byCodBar || byId || byPrv || byPhoneUnit;
     });
   }, [items, q]);
 
@@ -89,23 +92,32 @@ export default function ProductosPage() {
               Productos
             </h1>
             <p className="text-xs sm:text-sm text-gray-500">
-              Gestiona productos, relaciones y sus imágenes
+              Gestiona productos, fichas técnicas por categoría, proveedores e imágenes
             </p>
           </div>
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setOpenUpsert(true);
-            }}
-            className="self-start sm:self-auto text-xs sm:text-sm h-9 sm:h-10"
-          >
-            <Plus className="h-4 w-4 mr-1.5" /> Agregar producto
-          </Button>
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            <Button
+              variant="outline"
+              onClick={() => setOpenCatalogs(true)}
+              className="text-xs sm:text-sm h-9 sm:h-10"
+            >
+              <Truck className="h-4 w-4 mr-1.5 text-blue-600" /> Proveedores, Marcas y Modelos
+            </Button>
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setOpenUpsert(true);
+              }}
+              className="text-xs sm:text-sm h-9 sm:h-10"
+            >
+              <Plus className="h-4 w-4 mr-1.5" /> Agregar producto
+            </Button>
+          </div>
         </div>
 
         <div className="bg-white border border-gray-200 rounded-xl p-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <Input
-            placeholder="Buscar por nombre, código de barras, IMEI o ID..."
+            placeholder="Buscar por nombre, código de barras, IMEI, proveedor o ID..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
             className="w-full sm:max-w-sm text-xs sm:text-sm"
@@ -145,6 +157,13 @@ export default function ProductosPage() {
           producto={editing || undefined}
           isEditing={!!editing}
           onSubmit={editing ? handleUpdate : handleCreate}
+        />
+
+        {/* Modal Proveedores, Marcas y Modelos */}
+        <CatalogsSuppliersDialog
+          open={openCatalogs}
+          onOpenChange={setOpenCatalogs}
+          onCatalogChanged={load}
         />
 
         {/* Modal de Eliminación Lógica con diseño del sistema */}

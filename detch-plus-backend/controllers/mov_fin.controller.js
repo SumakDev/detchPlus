@@ -1,8 +1,11 @@
-import { MOV_FIN } from "../models/index.js";
+import { MOV_FIN, EMPLEADOS } from "../models/index.js";
 
 export async function getAll(req, res) {
   try {
-    const data = await MOV_FIN.findAll();
+    const data = await MOV_FIN.findAll({
+      include: [{ model: EMPLEADOS, as: "empleado" }],
+      order: [["FEC_MOV_FIN", "DESC"]],
+    });
     return res.json(data);
   } catch (error) {
     return res.status(500).json({ error: error.message });
@@ -11,7 +14,9 @@ export async function getAll(req, res) {
 
 export async function getOne(req, res) {
   try {
-    const data = await MOV_FIN.findByPk(req.params.id);
+    const data = await MOV_FIN.findByPk(req.params.id, {
+      include: [{ model: EMPLEADOS, as: "empleado" }],
+    });
     return data ? res.json(data) : res.status(404).json({ error: "No encontrado" });
   } catch (error) {
     return res.status(500).json({ error: error.message });

@@ -14,7 +14,7 @@ import {
   ShieldCheck,
   Eye,
   Printer,
-  CheckCircle2,
+  History,
 } from "lucide-react";
 import { formatEstadoProducto } from "@/types/product";
 
@@ -28,7 +28,7 @@ function getAuthHeaders(): Record<string, string> {
 
 export default function ReportesPage() {
   const [reportesResumen, setReportesResumen] = useState<any>(null);
-  const [selectedType, setSelectedType] = useState<"ventas" | "stock" | "servicios" | "clientes">("ventas");
+  const [selectedType, setSelectedType] = useState<"ventas" | "stock" | "movimientos" | "servicios" | "clientes">("ventas");
   const [reportData, setReportData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedFactura, setSelectedFactura] = useState<any | null>(null);
@@ -70,12 +70,12 @@ export default function ReportesPage() {
     loadTypeData("ventas");
   }, []);
 
-  function handleSelectType(type: "ventas" | "stock" | "servicios" | "clientes") {
+  function handleSelectType(type: "ventas" | "stock" | "movimientos" | "servicios" | "clientes") {
     setSelectedType(type);
     loadTypeData(type);
   }
 
-  function formatReportData(tipo: "ventas" | "stock" | "servicios" | "clientes", rawData: any[]) {
+  function formatReportData(tipo: "ventas" | "stock" | "movimientos" | "servicios" | "clientes", rawData: any[]) {
     if (!rawData || !rawData.length) return { headers: [], rows: [] };
 
     if (tipo === "stock") {
@@ -118,6 +118,40 @@ export default function ReportesPage() {
           Number(r.STO_MAX || 0),
           situacion,
           r.FEC_ACT_STO ? new Date(r.FEC_ACT_STO).toLocaleDateString() : "—",
+        ];
+      });
+      return { headers, rows };
+    }
+
+    if (tipo === "movimientos") {
+      const headers = [
+        "ID Mov.",
+        "Fecha y Hora",
+        "Producto",
+        "Código Barras",
+        "Tipo Movimiento",
+        "Cantidad",
+        "Motivo / Operación",
+        "Documento Ref.",
+        "Responsable",
+      ];
+      const rows = rawData.map((r) => {
+        const marca = r.producto?.marca?.NOM_MAR || "";
+        const modelo = r.producto?.modelo?.NOM_MOD || "";
+        const prodName =
+          [marca, modelo].filter(Boolean).join(" ") ||
+          r.producto?.DES_PRO ||
+          `Producto #${r.ID_PRO}`;
+        return [
+          `MOV-${String(r.ID_MOV).padStart(4, "0")}`,
+          r.FEC_MOV ? new Date(r.FEC_MOV).toLocaleString("es-EC") : "—",
+          prodName,
+          r.producto?.COD_BAR_PRO ?? "S/C",
+          r.TIP_MOV ?? "AJUSTE",
+          r.CAN_MOV ?? 0,
+          r.MOT_MOV ?? "Movimiento de inventario",
+          r.NUM_DOC_MOV ?? "—",
+          r.empleado ? `${r.empleado.NOM_EMP} ${r.empleado.APE_EMP}` : r.CED_EMP || "Sistema",
         ];
       });
       return { headers, rows };
@@ -240,7 +274,7 @@ export default function ReportesPage() {
         </div>
 
         {/* Tarjetas informativas de reportes predefinidos */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <Card
             onClick={() => handleSelectType("ventas")}
             className={`cursor-pointer transition-all border-2 ${
@@ -274,6 +308,24 @@ export default function ReportesPage() {
               </div>
               <h3 className="font-bold text-gray-900">Stock & Existencias</h3>
               <p className="text-xs text-gray-500">Niveles disponibles, stock mínimo y productos agotados.</p>
+            </CardContent>
+          </Card>
+
+          <Card
+            onClick={() => handleSelectType("movimientos")}
+            className={`cursor-pointer transition-all border-2 ${
+              selectedType === "movimientos" ? "border-blue-600 bg-blue-50/20 shadow-sm" : "border-transparent hover:border-gray-200"
+            }`}
+          >
+            <CardContent className="p-5 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="p-2 rounded-lg bg-indigo-100 text-indigo-700">
+                  <History className="h-5 w-5" />
+                </span>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">MOV_INV</span>
+              </div>
+              <h3 className="font-bold text-gray-900">Kardex Inventario</h3>
+              <p className="text-xs text-gray-500">Entradas, salidas por ventas, altas de IMEI y ajustes.</p>
             </CardContent>
           </Card>
 
@@ -641,4 +693,3 @@ export default function ReportesPage() {
     </Layout>
   );
 }
-

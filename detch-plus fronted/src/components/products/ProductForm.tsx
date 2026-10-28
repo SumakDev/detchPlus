@@ -5,8 +5,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import ImageUploader from "./ImageUploader";
-import { fetchCategorias, fetchMarcas, fetchModelosByMarca } from "@/lib/api/catalogos";
-import type { DetalleTelefono, EstadoProducto, OrigenProducto, DisponibilidadTelefono } from "@/types/product";
+import {
+  fetchCategorias,
+  fetchMarcas,
+  fetchModelosByMarca,
+  fetchProveedores,
+} from "@/lib/api/catalogos";
+import type {
+  DetalleTelefono,
+  DetalleReloj,
+  DetalleConsola,
+  Proveedor,
+  EstadoProducto,
+  OrigenProducto,
+  DisponibilidadTelefono,
+} from "@/types/product";
 import { formatEstadoProducto } from "@/types/product";
 import {
   Link as LinkIcon,
@@ -16,6 +29,9 @@ import {
   Plus,
   Copy,
   Smartphone,
+  Watch,
+  Gamepad2,
+  Truck,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
@@ -52,6 +68,7 @@ export default function ProductForm({
     ID_CAT: "" as number | "",
     ID_MAR: "" as number | "",
     ID_MOD: "" as string | "",
+    ID_PRV: "" as number | "",
     DES_PRO: "",
     ORG_PRO: "COMPRA_NUEVA" as OrigenProducto,
     EST_PRO: "NUEVO" as EstadoProducto,
@@ -64,12 +81,25 @@ export default function ProductForm({
   });
 
   const [detallesTelefono, setDetallesTelefono] = useState<DetalleTelefono[]>([]);
+  const [detalleReloj, setDetalleReloj] = useState<DetalleReloj>({
+    TAM_REL: "",
+    COL_REL: "",
+    TIP_REL: "SMART_WATCH",
+  });
+  const [detalleConsola, setDetalleConsola] = useState<DetalleConsola>({
+    CAP_CON: "",
+    NUM_CON: 1,
+    VER_CON: "",
+    EST_CON: "",
+  });
+
   const [expandedDiagIndex, setExpandedDiagIndex] = useState<number | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const [categorias, setCategorias] = useState<Array<{ ID_CAT: number; NOM_CAT: string }>>([]);
   const [marcas, setMarcas] = useState<Array<{ ID_MAR: number; NOM_MAR: string }>>([]);
   const [modelos, setModelos] = useState<Array<{ ID_MOD: string; NOM_MOD: string }>>([]);
+  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [existingImg, setExistingImg] = useState<string | undefined>(undefined);
   const [urlImgValid, setUrlImgValid] = useState<boolean | null>(null);
 
@@ -79,6 +109,7 @@ export default function ProductForm({
   useEffect(() => {
     fetchCategorias().then(setCategorias).catch(() => setCategorias([]));
     fetchMarcas().then(setMarcas).catch(() => setMarcas([]));
+    fetchProveedores().then(setProveedores).catch(() => setProveedores([]));
   }, []);
 
   useEffect(() => {
@@ -98,6 +129,7 @@ export default function ProductForm({
         ID_CAT: producto.ID_CAT ?? "",
         ID_MAR: producto.ID_MAR ?? "",
         ID_MOD: producto.ID_MOD ?? "",
+        ID_PRV: producto.ID_PRV ?? "",
         DES_PRO: producto.DES_PRO || "",
         ORG_PRO: (producto.ORG_PRO || "COMPRA_NUEVA") as OrigenProducto,
         EST_PRO: (producto.EST_PRO || "NUEVO") as EstadoProducto,
@@ -132,15 +164,50 @@ export default function ProductForm({
       } else {
         setDetallesTelefono([]);
       }
+
+      if (producto.detalleReloj) {
+        setDetalleReloj({
+          TAM_REL: producto.detalleReloj.TAM_REL || "",
+          COL_REL: producto.detalleReloj.COL_REL || "",
+          TIP_REL: producto.detalleReloj.TIP_REL === "FITNESS_BAND" ? "FITNESS_BAND" : "SMART_WATCH",
+        });
+      } else {
+        setDetalleReloj({ TAM_REL: "", COL_REL: "", TIP_REL: "SMART_WATCH" });
+      }
+
+      if (producto.detalleConsola) {
+        setDetalleConsola({
+          CAP_CON: producto.detalleConsola.CAP_CON || "",
+          NUM_CON: producto.detalleConsola.NUM_CON ?? 1,
+          VER_CON: producto.detalleConsola.VER_CON || "",
+          EST_CON: producto.detalleConsola.EST_CON || "",
+        });
+      } else {
+        setDetalleConsola({ CAP_CON: "", NUM_CON: 1, VER_CON: "", EST_CON: "" });
+      }
     }
   }, [producto]);
 
+  const selectedCatName = useMemo(() => {
+    if (!form.ID_CAT) return "";
+    const found = categorias.find((c) => Number(c.ID_CAT) === Number(form.ID_CAT));
+    return (found?.NOM_CAT || "").toUpperCase();
+  }, [form.ID_CAT, categorias]);
+
   const isPhoneCategory = useMemo(() => {
     if (!form.ID_CAT) return false;
-    if (Number(form.ID_CAT) === 1) return true;
-    const found = categorias.find((c) => Number(c.ID_CAT) === Number(form.ID_CAT));
-    return found?.NOM_CAT?.toUpperCase() === "TELEFONO";
-  }, [form.ID_CAT, categorias]);
+    return Number(form.ID_CAT) === 1 || selectedCatName === "TELEFONO";
+  }, [form.ID_CAT, selectedCatName]);
+
+  const isWatchCategory = useMemo(() => {
+    if (!form.ID_CAT) return false;
+    return Number(form.ID_CAT) === 2 || selectedCatName === "RELOJ";
+  }, [form.ID_CAT, selectedCatName]);
+
+  const isConsoleCategory = useMemo(() => {
+    if (!form.ID_CAT) return false;
+    return Number(form.ID_CAT) === 3 || selectedCatName === "CONSOLA";
+  }, [form.ID_CAT, selectedCatName]);
 
   // Resumen en vivo de variantes agrupadas por Color + Almacenamiento + Estado
   const liveVariantSummary = useMemo(() => {
@@ -216,6 +283,7 @@ export default function ProductForm({
     if (type === "checkbox") return setForm((p) => ({ ...p, [name]: (e.target as HTMLInputElement).checked }));
     if (name === "ID_MAR") return setForm((p) => ({ ...p, ID_MAR: value ? Number(value) : "", ID_MOD: "" }));
     if (name === "ID_CAT") return setForm((p) => ({ ...p, ID_CAT: value ? Number(value) : "" }));
+    if (name === "ID_PRV") return setForm((p) => ({ ...p, ID_PRV: value ? Number(value) : "" }));
     setForm((p) => ({ ...p, [name]: value }));
   }
 
@@ -253,6 +321,7 @@ export default function ProductForm({
       fd.append("ID_CAT", String(form.ID_CAT));
       fd.append("ID_MAR", String(form.ID_MAR));
       if (form.ID_MOD) fd.append("ID_MOD", String(form.ID_MOD));
+      fd.append("ID_PRV", form.ID_PRV ? String(form.ID_PRV) : "");
       if (form.DES_PRO) fd.append("DES_PRO", form.DES_PRO);
       fd.append("ORG_PRO", form.ORG_PRO);
       fd.append("EST_PRO", form.EST_PRO);
@@ -263,6 +332,12 @@ export default function ProductForm({
 
       if (isPhoneCategory) {
         fd.append("DETALLES_TELEFONO", JSON.stringify(detallesTelefono));
+      }
+      if (isWatchCategory) {
+        fd.append("DETALLE_RELOJ", JSON.stringify(detalleReloj));
+      }
+      if (isConsoleCategory) {
+        fd.append("DETALLE_CONSOLA", JSON.stringify(detalleConsola));
       }
 
       if (form.removeImage) {
@@ -333,7 +408,7 @@ export default function ProductForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <div className="grid gap-2">
           <Label>Categoría</Label>
           <select name="ID_CAT" value={form.ID_CAT} onChange={handleChange} className="border rounded px-2 py-2 text-sm" required>
@@ -367,7 +442,128 @@ export default function ProductForm({
             ))}
           </select>
         </div>
+        <div className="grid gap-2">
+          <Label className="flex items-center gap-1">
+            <Truck className="w-3.5 h-3.5 text-gray-500" /> Proveedor
+          </Label>
+          <select
+            name="ID_PRV"
+            value={form.ID_PRV}
+            onChange={handleChange}
+            className="border rounded px-2 py-2 text-sm"
+          >
+            <option value="">(Sin proveedor asignado)</option>
+            {proveedores.map((prv) => (
+              <option key={prv.ID_PRV} value={prv.ID_PRV}>
+                {prv.NOM_PRV} {prv.RUC_PRV ? `(${prv.RUC_PRV})` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
+
+      {/* SECCIÓN FICHA TÉCNICA DE RELOJ / SMARTWATCH (DET_REL) */}
+      {isWatchCategory && (
+        <div className="border border-purple-200 rounded-xl p-4 bg-purple-50/30 space-y-3">
+          <div className="flex items-center gap-2">
+            <Watch className="w-4 h-4 text-purple-600" />
+            <Label className="text-sm font-bold text-gray-900">
+              Ficha Técnica de Reloj / SmartWatch (DET_REL)
+            </Label>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid gap-1.5">
+              <Label className="text-xs text-gray-700">Tipo de Dispositivo *</Label>
+              <select
+                value={detalleReloj.TIP_REL || "SMART_WATCH"}
+                onChange={(e) =>
+                  setDetalleReloj((prev) => ({
+                    ...prev,
+                    TIP_REL: e.target.value as "SMART_WATCH" | "FITNESS_BAND",
+                  }))
+                }
+                className="h-9 border rounded px-2.5 text-xs bg-white font-medium"
+              >
+                <option value="SMART_WATCH">SmartWatch (Reloj Inteligente)</option>
+                <option value="FITNESS_BAND">Fitness Band (Pulsera Deportiva)</option>
+              </select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs text-gray-700">Tamaño de Caja (TAM_REL)</Label>
+              <Input
+                value={detalleReloj.TAM_REL || ""}
+                onChange={(e) => setDetalleReloj((prev) => ({ ...prev, TAM_REL: e.target.value }))}
+                placeholder="Ej. 41mm, 45mm, 49mm Ultra"
+                className="h-9 text-xs bg-white"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs text-gray-700">Color / Correa (COL_REL)</Label>
+              <Input
+                list="phone-colors-list"
+                value={detalleReloj.COL_REL || ""}
+                onChange={(e) => setDetalleReloj((prev) => ({ ...prev, COL_REL: e.target.value }))}
+                placeholder="Ej. Medianoche, Estelar, Titanio"
+                className="h-9 text-xs bg-white"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SECCIÓN FICHA TÉCNICA DE CONSOLA (DET_CON) */}
+      {isConsoleCategory && (
+        <div className="border border-indigo-200 rounded-xl p-4 bg-indigo-50/30 space-y-3">
+          <div className="flex items-center gap-2">
+            <Gamepad2 className="w-4 h-4 text-indigo-600" />
+            <Label className="text-sm font-bold text-gray-900">
+              Ficha Técnica de Consola (DET_CON)
+            </Label>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid gap-1.5">
+              <Label className="text-xs text-gray-700">Versión / Edición (VER_CON)</Label>
+              <Input
+                value={detalleConsola.VER_CON || ""}
+                onChange={(e) => setDetalleConsola((prev) => ({ ...prev, VER_CON: e.target.value }))}
+                placeholder="Ej. Edición Disco, Digital, OLED"
+                className="h-9 text-xs bg-white"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs text-gray-700">Capacidad (CAP_CON)</Label>
+              <Input
+                value={detalleConsola.CAP_CON || ""}
+                onChange={(e) => setDetalleConsola((prev) => ({ ...prev, CAP_CON: e.target.value }))}
+                placeholder="Ej. 512GB, 825GB, 1TB"
+                className="h-9 text-xs bg-white"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs text-gray-700">Nº de Controles Incluidos</Label>
+              <Input
+                type="number"
+                min={0}
+                max={8}
+                value={detalleConsola.NUM_CON ?? 1}
+                onChange={(e) =>
+                  setDetalleConsola((prev) => ({ ...prev, NUM_CON: Math.max(0, Number(e.target.value)) }))
+                }
+                className="h-9 text-xs bg-white"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs text-gray-700">Detalle / Accesorios (EST_CON)</Label>
+              <Input
+                value={detalleConsola.EST_CON || ""}
+                onChange={(e) => setDetalleConsola((prev) => ({ ...prev, EST_CON: e.target.value }))}
+                placeholder="Ej. Sellada en caja, cables HDMI originales"
+                className="h-9 text-xs bg-white"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* SECCIÓN 1:N UNIDADES INDIVIDUALES DE TELÉFONO (DET_TELE) */}
       {isPhoneCategory && (

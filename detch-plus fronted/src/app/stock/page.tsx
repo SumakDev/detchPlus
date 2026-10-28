@@ -8,6 +8,8 @@ import StockKpis from "@/components/stock/StockKpis";
 import StockTable from "@/components/stock/StockTable";
 import AdjustStockDialog from "@/components/stock/AdjustStockDialog";
 import PhoneUnitsStockDialog from "@/components/stock/PhoneUnitsStockDialog";
+import KardexMovimientosDialog from "@/components/stock/KardexMovimientosDialog";
+import { History } from "lucide-react";
 import type { StockItem } from "@/types/stock";
 import { formatEstadoProducto } from "@/types/product";
 import { fetchStock, postAjusteDisponible, putMinMax } from "@/lib/api/stock";
@@ -24,6 +26,9 @@ export default function StockPage() {
 
   const [openPhoneUnits, setOpenPhoneUnits] = useState(false);
   const [phoneUnitsItemId, setPhoneUnitsItemId] = useState<string | null>(null);
+
+  const [openKardex, setOpenKardex] = useState(false);
+  const [kardexItem, setKardexItem] = useState<StockItem | null>(null);
 
   async function load() {
     try {
@@ -178,6 +183,17 @@ export default function StockPage() {
             </Button>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setKardexItem(null);
+                setOpenKardex(true);
+              }}
+              className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-semibold"
+            >
+              <History className="w-4 h-4 mr-1.5" />
+              Kardex General (MOV_INV)
+            </Button>
             <Button variant="outline" onClick={exportCsv}>
               Exportar CSV
             </Button>
@@ -206,6 +222,10 @@ export default function StockPage() {
             onManagePhoneUnits={(row) => {
               setPhoneUnitsItemId(row.id);
               setOpenPhoneUnits(true);
+            }}
+            onViewKardex={(row) => {
+              setKardexItem(row);
+              setOpenKardex(true);
             }}
             onUpdateMin={async (row) => {
               const val = prompt(`Nuevo mínimo para "${row.producto?.nombre || row.id}"`, String(row.minimo));
@@ -251,6 +271,13 @@ export default function StockPage() {
           setOpen={setOpenPhoneUnits}
           item={currentPhoneUnitsItem}
           onUpdated={load}
+        />
+
+        {/* Modal de Kardex / Historial de Movimientos de Inventario (MOV_INV) */}
+        <KardexMovimientosDialog
+          open={openKardex}
+          setOpen={setOpenKardex}
+          item={kardexItem}
         />
       </div>
     </Layout>

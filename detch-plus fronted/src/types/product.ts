@@ -2,6 +2,7 @@
 export type OrigenProducto = "COMPRA_NUEVA" | "PARTE_PAGO" | "CONSIGNACION";
 export type EstadoProducto = "NUEVO" | "USADO_EXCELENTE" | "USADO_BUENO" | "USADO_REGULAR";
 export type DisponibilidadTelefono = "DISPONIBLE" | "RESERVADO" | "VENDIDO" | "BAJA";
+export type TipoReloj = "SMART_WATCH" | "FITNESS_BAND";
 
 export function formatEstadoProducto(estado?: string | null): string {
   switch (estado) {
@@ -50,6 +51,35 @@ export type DetalleTelefono = {
   FEC_ING_TEL?: string;
 };
 
+// Ficha Técnica de Reloj (1:1 en DET_REL)
+export type DetalleReloj = {
+  ID_PRO?: number;
+  TAM_REL?: string | null;
+  COL_REL?: string | null;
+  TIP_REL?: "SMART_WATCH" | "FITNESS_BAND";
+};
+
+// Ficha Técnica de Consola (1:1 en DET_CON)
+export type DetalleConsola = {
+  ID_PRO?: number;
+  CAP_CON?: string | null;
+  NUM_CON?: number;
+  EST_CON?: string | null;
+  VER_CON?: string | null;
+};
+
+// Proveedor (PROVEEDORES)
+export type Proveedor = {
+  ID_PRV: number;
+  NOM_PRV: string;
+  RUC_PRV?: string | null;
+  TEL_PRV?: string | null;
+  COR_PRV?: string | null;
+  DIR_PRV?: string | null;
+  CON_PRI_PRV?: string | null;
+  EST_PRV?: boolean;
+};
+
 // Conteo agrupado por Color + Almacenamiento + Estado Físico
 export type ResumenVarianteTelefono = {
   color: string;
@@ -94,11 +124,16 @@ export type Producto = {
   categoria?: CategoriaRef;
   marca?: MarcaRef;
   modelo?: ModeloRef;
+  proveedor?: Proveedor | null;
   precios?: Array<{ TIP_PRE: string; VAL_PRE: number }>;
   stock?: { CAN_DIS_STO: number; CAN_RES_STO: number; STO_MIN: number; STO_MAX: number };
   detallesTelefono?: DetalleTelefono[];
+  detalleReloj?: DetalleReloj | null;
+  detalleConsola?: DetalleConsola | null;
   RESUMEN_VARIANTES?: ResumenVarianteTelefono[];
 };
+
+export type Product = Producto;
 
 // Datos del formulario (antes de convertir a FormData)
 export type ProductoFormData = {
@@ -107,6 +142,7 @@ export type ProductoFormData = {
   ID_CAT: number;
   ID_MAR: number;
   ID_MOD?: string;
+  ID_PRV?: number | null;
 
   DES_PRO?: string;
   ORG_PRO: OrigenProducto;
@@ -119,4 +155,8 @@ export type ProductoFormData = {
   IMG_URL?: string;
   removeImage?: boolean;
   detallesTelefono?: DetalleTelefono[];
+  DETALLE_RELOJ?: DetalleReloj | null;
+  DETALLE_CONSOLA?: DetalleConsola | null;
 };
+
+export type ProductInput = ProductoFormData;

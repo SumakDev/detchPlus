@@ -1,4 +1,4 @@
-import { dbToUi, type StockDb, type StockFilters, type StockItem } from "@/types/stock";
+import { dbToUi, type StockDb, type StockFilters, type StockItem, type MovimientoInventario } from "@/types/stock";
 import type { DetalleTelefono } from "@/types/product";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
@@ -121,4 +121,26 @@ export async function putUbicacion(idPro: number | string, ubicacion: string) {
     body: JSON.stringify({ ubicacion }),
   });
   return handleJson(res);
+}
+
+// Consultar el historial de movimientos de inventario (Kardex - tabla MOV_INV)
+export async function fetchMovimientosStock(params?: {
+  idPro?: number | string;
+  tipMov?: string;
+  q?: string;
+}): Promise<MovimientoInventario[]> {
+  const qs = new URLSearchParams();
+  if (params?.tipMov && params.tipMov !== "TODOS") qs.set("tipMov", params.tipMov);
+  if (params?.q) qs.set("q", params.q);
+
+  const path = params?.idPro
+    ? `${API}/stock/movimientos/${encodeURIComponent(String(params.idPro))}`
+    : `${API}/stock/movimientos`;
+
+  const res = await fetch(`${path}${qs.toString() ? `?${qs.toString()}` : ""}`, {
+    headers: { ...getAuthHeaders() },
+    cache: "no-store",
+  });
+  const json = await handleJson(res);
+  return Array.isArray(json) ? json : [];
 }

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/hooks/useAuth";
-import { Apple, ShoppingBag, ArrowLeft, CheckCircle2, ShieldCheck, Truck, Banknote, Building2, Lock, AlertTriangle } from "lucide-react";
+import { Apple, ShoppingBag, ArrowLeft, CheckCircle2, ShieldCheck, Truck, Banknote, Building2, Lock, AlertTriangle, Ticket, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,6 +62,48 @@ export default function CheckoutPage() {
   const loadingRef = useRef(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [completedOrder, setCompletedOrder] = useState<any | null>(null);
+
+  // Estados para Cupón de Descuento (CUPONES)
+  const [couponCode, setCouponCode] = useState("");
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<any | null>(null);
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
+
+  const finalTotal = Math.max(0, Number((subtotal - discountAmount + iva).toFixed(2)));
+
+  async function handleApplyCoupon() {
+    if (!couponCode.trim()) return;
+    setCouponError(null);
+    setCouponLoading(true);
+    try {
+      const res = await fetch(`${API}/cupones/validar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codigo: couponCode.trim(), subtotal }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.valid) {
+        setAppliedCoupon(null);
+        setDiscountAmount(0);
+        setCouponError(data.error || "Cupón no válido.");
+        return;
+      }
+      setAppliedCoupon(data.cupon);
+      setDiscountAmount(Number(data.descuento || 0));
+    } catch {
+      setCouponError("Error al validar el cupón.");
+    } finally {
+      setCouponLoading(false);
+    }
+  }
+
+  function handleRemoveCoupon() {
+    setAppliedCoupon(null);
+    setDiscountAmount(0);
+    setCouponCode("");
+    setCouponError(null);
+  }
 
   // Sincronizar disponibilidad real del carrito al entrar a Checkout
   useEffect(() => {
@@ -159,6 +201,7 @@ export default function CheckoutPage() {
         provincia,
         metodoPago,
         notas,
+        codigoCupon: appliedCoupon?.COD_CUP || undefined,
         items: items.map((i) => ({
           id: i.id,
           cantidad: i.quantity,
@@ -584,12 +627,62 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
+              {/* Cupón de Descuento (CUPONES) */}
+              <div className="border-t border-gray-100 pt-4 space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
+                  <Ticket className="w-3.5 h-3.5 text-blue-600" /> Cupón de Descuento
+                </Label>
+                {appliedCoupon ? (
+                  <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-2.5 text-xs">
+                    <div>
+                      <span className="font-mono font-bold text-emerald-900">{appliedCoupon.COD_CUP}</span>
+                      <span className="text-emerald-700 ml-1.5">({appliedCoupon.NOM_CUP})</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveCoupon}
+                      className="text-emerald-700 hover:text-emerald-950 p-1 rounded-md"
+                      title="Quitar cupón"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                      placeholder="Ej. BIENVENIDO10"
+                      className="text-xs uppercase font-mono h-9"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleApplyCoupon}
+                      disabled={couponLoading || !couponCode.trim()}
+                      className="h-9 px-4 text-xs font-semibold shrink-0"
+                    >
+                      {couponLoading ? "..." : "Aplicar"}
+                    </Button>
+                  </div>
+                )}
+                {couponError && (
+                  <p className="text-[11px] text-rose-600 font-medium">{couponError}</p>
+                )}
+              </div>
+
               {/* Totals */}
               <div className="border-t border-gray-100 pt-4 space-y-2 text-sm text-gray-600">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
                   <span className="font-medium text-gray-900">${subtotal.toFixed(2)}</span>
                 </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-emerald-600 font-semibold">
+                    <span>Descuento ({appliedCoupon?.COD_CUP})</span>
+                    <span>- ${discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span>IVA (15%)</span>
                   <span className="font-medium text-gray-900">${iva.toFixed(2)}</span>
@@ -600,7 +693,7 @@ export default function CheckoutPage() {
                 </div>
                 <div className="border-t border-gray-200 pt-3 flex justify-between text-lg font-extrabold text-gray-900">
                   <span>Total Final</span>
-                  <span>${total.toFixed(2)}</span>
+                  <span>${finalTotal.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -615,7 +708,7 @@ export default function CheckoutPage() {
                 disabled={loading}
                 className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold hover:bg-gray-800 transition shadow-lg text-base"
               >
-                {loading ? "Procesando Pedido..." : `Confirmar y Pagar $${total.toFixed(2)}`}
+                {loading ? "Procesando Pedido..." : `Confirmar y Pagar $${finalTotal.toFixed(2)}`}
               </Button>
 
               <div className="flex items-center justify-center gap-2 text-xs text-gray-400">

@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import type { Producto } from "@/types/product";
 import { formatEstadoProducto } from "@/types/product";
-import { Edit2, Trash2, Tag, Smartphone } from "lucide-react";
+import { Edit2, Trash2, Tag, Smartphone, Watch, Gamepad2, Truck } from "lucide-react";
 
 export default function ProductTable({
   productos,
@@ -90,6 +90,46 @@ export default function ProductTable({
               </div>
             )}
 
+            {/* Ficha técnica de Reloj (DET_REL) */}
+            {p.detalleReloj && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200 font-medium">
+                  <Watch className="w-3 h-3" />
+                  {[
+                    p.detalleReloj.TIP_REL === "FITNESS_BAND" ? "Fitness Band" : "SmartWatch",
+                    p.detalleReloj.TAM_REL,
+                    p.detalleReloj.COL_REL,
+                  ]
+                    .filter(Boolean)
+                    .join(" • ")}
+                </span>
+              </div>
+            )}
+
+            {/* Ficha técnica de Consola (DET_CON) */}
+            {p.detalleConsola && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-800 border border-indigo-200 font-medium">
+                  <Gamepad2 className="w-3 h-3" />
+                  {[
+                    p.detalleConsola.VER_CON,
+                    p.detalleConsola.CAP_CON,
+                    `${p.detalleConsola.NUM_CON ?? 1} ctrl(s)`,
+                  ]
+                    .filter(Boolean)
+                    .join(" • ")}
+                </span>
+              </div>
+            )}
+
+            {/* Proveedor */}
+            {p.proveedor?.NOM_PRV && (
+              <div className="flex items-center gap-1 text-[11px] text-gray-600">
+                <Truck className="w-3 h-3 text-gray-400" />
+                <span>Proveedor: <strong className="text-gray-800">{p.proveedor.NOM_PRV}</strong></span>
+              </div>
+            )}
+
             {/* Metadatos */}
             <div className="grid grid-cols-2 gap-2 text-xs bg-gray-50/80 rounded-lg p-2 text-gray-600">
               <div>
@@ -131,7 +171,7 @@ export default function ProductTable({
           <thead className="bg-gray-50/75 border-b border-gray-200">
             <tr className="text-left text-xs text-gray-500 uppercase tracking-wider">
               <th className="p-3.5">Imagen</th>
-              <th className="p-3.5">Nombre / Variantes (Color • Almacenamiento)</th>
+              <th className="p-3.5">Nombre / Variantes y Ficha Técnica</th>
               <th className="p-3.5">Código</th>
               <th className="p-3.5">Marca</th>
               <th className="p-3.5">Modelo</th>
@@ -176,6 +216,40 @@ export default function ProductTable({
                           <span className="text-[10px] text-blue-600">({formatEstadoProducto(v.estadoFisico)})</span>
                         </span>
                       ))}
+                    </div>
+                  )}
+                  {p.detalleReloj && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-purple-50 text-purple-800 border border-purple-200 font-medium">
+                        <Watch className="w-3 h-3" />
+                        {[
+                          p.detalleReloj.TIP_REL === "FITNESS_BAND" ? "Fitness Band" : "SmartWatch",
+                          p.detalleReloj.TAM_REL,
+                          p.detalleReloj.COL_REL,
+                        ]
+                          .filter(Boolean)
+                          .join(" • ")}
+                      </span>
+                    </div>
+                  )}
+                  {p.detalleConsola && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-200 font-medium">
+                        <Gamepad2 className="w-3 h-3" />
+                        {[
+                          p.detalleConsola.VER_CON,
+                          p.detalleConsola.CAP_CON,
+                          `${p.detalleConsola.NUM_CON ?? 1} ctrl(s)`,
+                        ]
+                          .filter(Boolean)
+                          .join(" • ")}
+                      </span>
+                    </div>
+                  )}
+                  {p.proveedor?.NOM_PRV && (
+                    <div className="flex items-center gap-1 text-[11px] text-gray-500 mt-1">
+                      <Truck className="w-3 h-3 text-gray-400" />
+                      <span>Prov: <strong className="text-gray-700 font-medium">{p.proveedor.NOM_PRV}</strong></span>
                     </div>
                   )}
                 </td>

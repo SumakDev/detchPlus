@@ -66,7 +66,11 @@ export default function VentasPage() {
   // Form nueva venta
   const [clientes, setClientes] = useState<any[]>([]);
   const [productos, setProductos] = useState<any[]>([]);
+  const [empleados, setEmpleados] = useState<any[]>([]);
+  const [evaluacionesTradeIn, setEvaluacionesTradeIn] = useState<any[]>([]);
   const [selectedClient, setSelectedClient] = useState("");
+  const [selectedEmpleado, setSelectedEmpleado] = useState("");
+  const [selectedEvaPar, setSelectedEvaPar] = useState("");
   const [selectedProduct, setSelectedProduct] = useState("");
   const [cantidad, setCantidad] = useState(1);
   const [precioUni, setPrecioUni] = useState(0);
@@ -122,12 +126,29 @@ export default function VentasPage() {
 
   async function loadFormOptions() {
     try {
-      const [resCli, resPro] = await Promise.all([
+      const [resCli, resPro, resEmp, resEva] = await Promise.all([
         fetch(`${API}/clientes`, { headers: { ...getAuthHeaders() } }),
         fetch(`${API}/productos`, { headers: { ...getAuthHeaders() } }),
+        fetch(`${API}/empleados`, { headers: { ...getAuthHeaders() } }),
+        fetch(`${API}/eva_par_pag`, { headers: { ...getAuthHeaders() } }),
       ]);
       if (resCli.ok) setClientes(await resCli.json());
       if (resPro.ok) setProductos(await resPro.json());
+      if (resEmp.ok) {
+        const emps = await resEmp.json();
+        if (Array.isArray(emps)) {
+          setEmpleados(emps);
+          if (emps.length > 0 && !selectedEmpleado) setSelectedEmpleado(emps[0].CED_EMP);
+        }
+      }
+      if (resEva.ok) {
+        const evas = await resEva.json();
+        if (Array.isArray(evas)) {
+          setEvaluacionesTradeIn(
+            evas.filter((ev: any) => ev.EST_EVA_PAR === "APROBADO" && (!ev.aplicaciones || ev.aplicaciones.length === 0))
+          );
+        }
+      }
     } catch (e) {
       console.error(e);
     }
@@ -185,6 +206,8 @@ export default function VentasPage() {
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({
           CED_CLI: selectedClient,
+          CED_EMP: selectedEmpleado || undefined,
+          ID_EVA_PAR: selectedEvaPar ? Number(selectedEvaPar) : undefined,
           DIR_FAC: "Venta directa en tienda",
           items: [
             {
@@ -201,9 +224,11 @@ export default function VentasPage() {
       }
       setOpenNew(false);
       setSelectedProduct("");
+      setSelectedEvaPar("");
       setCantidad(1);
       setPrecioUni(0);
       await loadData();
+      await loadFormOptions();
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -561,6 +586,43 @@ export default function VentasPage() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-700 block mb-1">Asesor / Empleado (CED_EMP)</label>
+                  <select
+                    value={selectedEmpleado}
+                    onChange={(e) => setSelectedEmpleado(e.target.value)}
+                    className="w-full border rounded-lg p-2 text-xs bg-white"
+                  >
+                    <option value="">Automático</option>
+                    {empleados.map((emp) => (
+                      <option key={emp.CED_EMP} value={emp.CED_EMP}>
+                        {emp.NOM_EMP} {emp.APE_EMP} ({emp.CED_EMP})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-700 block mb-1">
+                    Parte de Pago / Trade-In (Opcional)
+                  </label>
+                  <select
+                    value={selectedEvaPar}
+                    onChange={(e) => setSelectedEvaPar(e.target.value)}
+                    className="w-full border rounded-lg p-2 text-xs bg-white"
+                  >
+                    <option value="">Sin Parte de Pago</option>
+                    {evaluacionesTradeIn
+                      .filter((ev) => !selectedClient || ev.CED_CLI === selectedClient)
+                      .map((ev) => (
+                        <option key={ev.ID_EVA_PAR} value={ev.ID_EVA_PAR}>
+                          EVA-{ev.ID_EVA_PAR}: -${Number(ev.VAL_EVA_PAR).toFixed(2)} ({ev.producto?.DES_PRO || "Equipo"})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
               <div className="bg-gray-50 p-3 rounded-lg text-sm space-y-1">
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal:</span>
@@ -570,9 +632,31 @@ export default function VentasPage() {
                   <span>IVA (15%):</span>
                   <span>${(cantidad * precioUni * 0.15).toFixed(2)}</span>
                 </div>
+                {selectedEvaPar && (
+                  <div className="flex justify-between text-emerald-700 font-semibold">
+                    <span>Parte de Pago (Trade-In):</span>
+                    <span>
+                      -$
+                      {Number(
+                        evaluacionesTradeIn.find((e) => String(e.ID_EVA_PAR) === String(selectedEvaPar))?.VAL_EVA_PAR ||
+                          0
+                      ).toFixed(2)}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between font-bold text-gray-900 border-t pt-1">
-                  <span>Total estimado:</span>
-                  <span>${(cantidad * precioUni * 1.15).toFixed(2)}</span>
+                  <span>Total estimado a cobrar:</span>
+                  <span>
+                    $
+                    {Math.max(
+                      0,
+                      cantidad * precioUni * 1.15 -
+                        Number(
+                          evaluacionesTradeIn.find((e) => String(e.ID_EVA_PAR) === String(selectedEvaPar))
+                            ?.VAL_EVA_PAR || 0
+                        )
+                    ).toFixed(2)}
+                  </span>
                 </div>
               </div>
 

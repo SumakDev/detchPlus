@@ -35,6 +35,47 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 const CART_STORAGE_KEY = "detchplus_cart";
 
+function getLoggedUserId(): number | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const rawUser = localStorage.getItem("auth_user");
+    if (rawUser) {
+      const parsed = JSON.parse(rawUser);
+      const id = Number(parsed?.ID_USU || parsed?.id || 0);
+      if (id > 0) return id;
+    }
+    const token = localStorage.getItem("auth_token");
+    if (token && token.includes(".")) {
+      const payloadBase64 = token.split(".")[1];
+      const decoded = JSON.parse(atob(payloadBase64));
+      const id = Number(decoded?.ID_USU || decoded?.id || 0);
+      if (id > 0) return id;
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return null;
+}
+
+async function syncItemToCarCom(idPro: number, quantity: number, price?: number) {
+  const idUsu = getLoggedUserId();
+  if (!idUsu) return;
+  try {
+    await fetch(`${API}/car_com`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ID_USU: idUsu,
+        ID_PRO: idPro,
+        CAN_CAR_COM: quantity,
+        PRE_UNI_CAR: price,
+      }),
+    });
+  } catch {
+    // non-blocking background sync
+  }
+}
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -105,6 +146,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         if (!prod) {
           notices.push(`"${item.name}" fue retirado de tu bolsa porque ya no se encuentra activo en el catálogo.`);
           changed = true;
+          syncItemToCarCom(item.id, 0);
           continue;
         }
 
@@ -112,6 +154,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         if (stockDisp <= 0) {
           notices.push(`"${item.name}" fue retirado de tu bolsa porque se agotó su stock.`);
           changed = true;
+          syncItemToCarCom(item.id, 0);
           continue;
         }
 
@@ -183,6 +226,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       if (existing) {
         const desired = existing.quantity + quantity;
         const capped = maxAllowed !== undefined ? Math.min(desired, maxAllowed) : desired;
+        syncItemToCarCom(product.id, capped, product.price);
         return prev.map((item) =>
           item.id === product.id
             ? { ...item, ...product, quantity: capped, maxStock: maxAllowed }
@@ -192,12 +236,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
       const initialQty = maxAllowed !== undefined ? Math.min(quantity, maxAllowed) : quantity;
       if (initialQty <= 0) return prev;
+      syncItemToCarCom(product.id, initialQty, product.price);
       return [...prev, { ...product, quantity: initialQty }];
     });
     setIsOpen(true);
   }
 
   function removeFromCart(id: number) {
+    syncItemToCarCom(id, 0);
     setItems((prev) => prev.filter((item) => item.id !== id));
   }
 
@@ -210,12 +256,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       prev.map((item) => {
         if (item.id !== id) return item;
         const capped = item.maxStock !== undefined ? Math.min(quantity, item.maxStock) : quantity;
+        syncItemToCarCom(id, capped, item.price);
         return { ...item, quantity: capped };
       })
     );
   }
 
   function clearCart() {
+    const current = itemsRef.current;
+    for (const item of current) {
+      syncItemToCarCom(item.id, 0);
+    }
     setItems([]);
   }
 

@@ -4,17 +4,19 @@ import { useState, Fragment } from "react";
 import { StockItem } from "@/types/stock";
 import { formatEstadoProducto } from "@/types/product";
 import { Button } from "@/components/ui/button";
-import { Smartphone, ChevronDown, ChevronUp, Tag, Layers } from "lucide-react";
+import { Smartphone, ChevronDown, ChevronUp, Tag, Layers, History } from "lucide-react";
 
 export default function StockTable({
   items,
   onAdjust,
   onManagePhoneUnits,
+  onViewKardex,
   onUpdateMin,
 }: {
   items: StockItem[];
   onAdjust: (row: StockItem) => void;
   onManagePhoneUnits: (row: StockItem) => void;
+  onViewKardex: (row: StockItem) => void;
   onUpdateMin: (row: StockItem) => void;
 }) {
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
@@ -177,6 +179,16 @@ export default function StockTable({
                           Ajustar cantidad
                         </Button>
                       )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onViewKardex(r)}
+                        className="text-xs text-indigo-700 border-indigo-200 hover:bg-indigo-50"
+                        title="Ver historial de movimientos (MOV_INV) de este producto"
+                      >
+                        <History className="w-3.5 h-3.5 mr-1" />
+                        Kardex
+                      </Button>
                       {/* <Button variant="outline" size="sm" onClick={() => onUpdateMin(r)} className="text-xs">
                         Mínimo
                       </Button> */}

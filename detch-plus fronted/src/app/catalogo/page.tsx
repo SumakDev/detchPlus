@@ -19,6 +19,9 @@ import {
   Layers,
   ArrowLeft,
   PackageX,
+  Heart,
+  MessageSquare,
+  X,
 } from "lucide-react";
 import LoginModal from "@/components/auth/LoginModal";
 import RegisterModal from "@/components/auth/RegisterModal";
@@ -70,6 +73,108 @@ export default function CatalogoPage() {
 
   const auth = useAuth();
   const cart = useCart();
+
+  // Lista de deseos (LIS_DES)
+  const [wishlistIds, setWishlistIds] = useState<number[]>([]);
+
+  // Modal de reseñas (RES_PRO)
+  const [reviewProduct, setReviewProduct] = useState<CatalogProduct | null>(null);
+  const [reviewsList, setReviewsList] = useState<any[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [newRating, setNewRating] = useState(5);
+  const [newTitle, setNewTitle] = useState("");
+  const [newComment, setNewComment] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
+
+  useEffect(() => {
+    if (!auth.user?.ID_USU) {
+      setWishlistIds([]);
+      return;
+    }
+    fetch(`${API}/lis_des?idUsu=${auth.user.ID_USU}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setWishlistIds(data.map((d: any) => Number(d.ID_PRO)));
+        }
+      })
+      .catch(() => {});
+  }, [auth.user?.ID_USU]);
+
+  async function handleToggleWishlist(p: CatalogProduct) {
+    if (!auth.user?.ID_USU) {
+      setIsLoginOpen(true);
+      return;
+    }
+    try {
+      const res = await fetch(`${API}/lis_des`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ID_USU: auth.user.ID_USU, ID_PRO: p.id }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.removed) {
+          setWishlistIds((prev) => prev.filter((id) => id !== p.id));
+        } else {
+          setWishlistIds((prev) => (prev.includes(p.id) ? prev : [...prev, p.id]));
+        }
+      }
+    } catch (e) {
+      console.error("Error actualizando lista de deseos:", e);
+    }
+  }
+
+  async function openReviewsModal(p: CatalogProduct) {
+    setReviewProduct(p);
+    setNewRating(5);
+    setNewTitle("");
+    setNewComment("");
+    setReviewsLoading(true);
+    try {
+      const res = await fetch(`${API}/res_pro?idPro=${p.id}&est=APROBADA`);
+      const data = res.ok ? await res.json() : [];
+      setReviewsList(Array.isArray(data) ? data : []);
+    } catch {
+      setReviewsList([]);
+    } finally {
+      setReviewsLoading(false);
+    }
+  }
+
+  async function handleSubmitReview(e: React.FormEvent) {
+    e.preventDefault();
+    if (!reviewProduct) return;
+    if (!auth.user?.ID_USU) {
+      setIsLoginOpen(true);
+      return;
+    }
+    setSubmittingReview(true);
+    try {
+      const res = await fetch(`${API}/res_pro`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ID_USU: auth.user.ID_USU,
+          ID_PRO: reviewProduct.id,
+          CAL_RES_PRO: newRating,
+          TIT_RES_PRO: newTitle.trim() || null,
+          COM_RES_PRO: newComment.trim() || null,
+        }),
+      });
+      if (res.ok) {
+        const updatedRes = await fetch(`${API}/res_pro?idPro=${reviewProduct.id}&est=APROBADA`);
+        const updatedData = updatedRes.ok ? await updatedRes.json() : [];
+        setReviewsList(Array.isArray(updatedData) ? updatedData : []);
+        setNewTitle("");
+        setNewComment("");
+      }
+    } catch (err) {
+      console.error("Error enviando reseña:", err);
+    } finally {
+      setSubmittingReview(false);
+    }
+  }
 
   // Cargar productos directamente desde la base de datos
   useEffect(() => {
@@ -463,14 +568,26 @@ export default function CatalogoPage() {
                       </span>
                     </div>
 
-                    {/* Badge de Condición o Novedad */}
-                    {product.badge && (
-                      <div className="absolute top-3 right-3">
+                    {/* Badge de Condición o Novedad y Botón Lista de Deseos */}
+                    <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                      {product.badge && (
                         <span className={`inline-block px-2.5 py-1 rounded-lg text-white text-[11px] font-bold ${product.badgeColor}`}>
                           {product.badge}
                         </span>
-                      </div>
-                    )}
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleWishlist(product)}
+                        title={wishlistIds.includes(product.id) ? "Quitar de mi lista de deseos" : "Guardar en lista de deseos"}
+                        className={`p-2 rounded-full border shadow-xs transition ${
+                          wishlistIds.includes(product.id)
+                            ? "bg-rose-50 border-rose-200 text-rose-600"
+                            : "bg-white/95 border-gray-200/70 text-gray-500 hover:text-rose-600"
+                        }`}
+                      >
+                        <Heart className={`w-4 h-4 ${wishlistIds.includes(product.id) ? "fill-rose-600 text-rose-600" : ""}`} />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Detalles del Producto */}
@@ -511,12 +628,12 @@ export default function CatalogoPage() {
                   </div>
                 </div>
 
-                {/* Botón de Agregar al Carrito */}
-                <div className="p-5 pt-0">
+                {/* Botones de Acción (Bolsa + Reseñas) */}
+                <div className="p-5 pt-0 flex items-center gap-2">
                   <button
                     onClick={() => handleAddToCart(product)}
                     disabled={product.stock <= 0}
-                    className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-xs ${
+                    className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-xs ${
                       product.stock > 0
                         ? "bg-gray-900 text-white hover:bg-gray-800 hover:shadow-md cursor-pointer active:scale-98"
                         : "bg-gray-100 text-gray-400 cursor-not-allowed"
@@ -524,6 +641,15 @@ export default function CatalogoPage() {
                   >
                     <ShoppingBag className="w-4 h-4" />
                     {product.stock > 0 ? "Agregar a la bolsa" : "Agotado"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openReviewsModal(product)}
+                    title="Ver y escribir reseñas"
+                    className="py-2.5 px-3 rounded-xl text-xs font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition flex items-center gap-1"
+                  >
+                    <MessageSquare className="w-4 h-4 text-amber-500" />
+                    <span>Reseñas</span>
                   </button>
                 </div>
               </article>
@@ -576,6 +702,124 @@ export default function CatalogoPage() {
           </div>
         </div>
       </footer>
+
+      {/* Modal de Reseñas de Producto (RES_PRO) */}
+      {reviewProduct && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[88vh] flex flex-col shadow-2xl border border-gray-100 overflow-hidden">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600">Opiniones de Clientes</span>
+                <h3 className="text-base font-bold text-gray-900 line-clamp-1">{reviewProduct.name}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReviewProduct(null)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto space-y-5 flex-1">
+              {/* Lista de reseñas */}
+              <div className="space-y-3">
+                {reviewsLoading ? (
+                  <p className="text-xs text-gray-400 text-center py-4">Cargando reseñas...</p>
+                ) : reviewsList.length === 0 ? (
+                  <p className="text-xs text-gray-500 text-center py-4 bg-gray-50 rounded-xl border border-gray-100">
+                    Este producto aún no tiene reseñas. ¡Sé el primero en calificarlo!
+                  </p>
+                ) : (
+                  reviewsList.map((r) => {
+                    const author = [r.usuario?.NOM_USU, r.usuario?.APE_USU].filter(Boolean).join(" ") || `Usuario #${r.ID_USU}`;
+                    const stars = Number(r.CAL_RES_PRO || 5);
+                    return (
+                      <div key={r.ID_RES_PRO} className="p-3.5 rounded-xl bg-gray-50 border border-gray-100 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-gray-900">{author}</span>
+                          <div className="flex items-center gap-0.5">
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <Star
+                                key={s}
+                                className={`w-3.5 h-3.5 ${s <= stars ? "text-amber-500 fill-amber-500" : "text-gray-300"}`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        {r.TIT_RES_PRO && <p className="text-xs font-semibold text-gray-800">{r.TIT_RES_PRO}</p>}
+                        {r.COM_RES_PRO && <p className="text-xs text-gray-600 leading-relaxed">{r.COM_RES_PRO}</p>}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Formulario para dejar reseña */}
+              <form onSubmit={handleSubmitReview} className="border-t border-gray-100 pt-4 space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">Escribir una reseña</h4>
+                {!auth.user ? (
+                  <div className="p-3 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-900 flex items-center justify-between">
+                    <span>Inicia sesión para calificar este producto.</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        setReviewProduct(null);
+                        setIsLoginOpen(true);
+                      }}
+                      className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      Iniciar Sesión
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-600">Tu calificación:</span>
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => setNewRating(s)}
+                            className="p-0.5"
+                          >
+                            <Star
+                              className={`w-5 h-5 ${s <= newRating ? "text-amber-500 fill-amber-500" : "text-gray-300"}`}
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <Input
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      placeholder="Título breve (ej. Excelente calidad)"
+                      className="text-xs h-9"
+                    />
+                    <textarea
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      placeholder="Comparte tu experiencia con este producto..."
+                      rows={3}
+                      required
+                      className="w-full rounded-xl border border-gray-200 p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <Button
+                      type="submit"
+                      disabled={submittingReview}
+                      className="w-full bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold h-9 rounded-xl"
+                    >
+                      {submittingReview ? "Publicando..." : "Publicar Reseña"}
+                    </Button>
+                  </>
+                )}
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modales del Sistema */}
       <LoginModal

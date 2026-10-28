@@ -1,8 +1,14 @@
-import { OBS } from "../models/index.js";
+import { OBS, CLIENTES, EMPLEADOS } from "../models/index.js";
 
 export async function getAll(req, res) {
   try {
-    const data = await OBS.findAll();
+    const data = await OBS.findAll({
+      include: [
+        { model: CLIENTES, as: "cliente" },
+        { model: EMPLEADOS, as: "empleado" },
+      ],
+      order: [["FEC_OBS", "DESC"]],
+    });
     return res.json(data);
   } catch (error) {
     return res.status(500).json({ error: error.message });

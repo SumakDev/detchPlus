@@ -2,7 +2,9 @@ import { EMPLEADOS } from "../models/index.js";
 
 export async function getAll(req, res) {
   try {
-    const data = await EMPLEADOS.findAll();
+    const data = await EMPLEADOS.findAll({
+      order: [["FEC_CRE_EMP", "DESC"]],
+    });
     return res.json(data);
   } catch (error) {
     return res.status(500).json({ error: error.message });

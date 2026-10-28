@@ -1,6 +1,19 @@
 import { Op } from "sequelize";
 import sequelize from "../config/database.js";
-import { FACTURAS, DET_FAC, CLIENTES, EMPLEADOS, PRODUCTOS, DET_TELE, STOCK, MOV_INV, PED_ONL } from "../models/index.js";
+import {
+  FACTURAS,
+  DET_FAC,
+  CLIENTES,
+  EMPLEADOS,
+  PRODUCTOS,
+  DET_TELE,
+  STOCK,
+  MOV_INV,
+  PED_ONL,
+  EVA_PAR_PAG,
+  PAR_PAG_APL,
+  MOV_FIN,
+} from "../models/index.js";
 import { syncPhoneStock } from "./det_tele.controller.js";
 
 // GET /api/ventas/resumen
@@ -107,6 +120,11 @@ export async function getAll(req, res) {
           attributes: ["CED_CLI", "NOM_CLI", "APE_CLI", "NUM_CLI", "COR_CLI"],
         },
         {
+          model: EMPLEADOS,
+          as: "empleado",
+          attributes: ["CED_EMP", "NOM_EMP", "APE_EMP"],
+        },
+        {
           model: DET_FAC,
           as: "detalles",
           include: [
@@ -116,6 +134,10 @@ export async function getAll(req, res) {
               attributes: ["ID_PRO", "DES_PRO", "COD_BAR_PRO", "IMG_URL"],
             },
           ],
+        },
+        {
+          model: PAR_PAG_APL,
+          as: "partesPagoAplicadas",
         },
       ],
       order: [["FEC_FAC", "DESC"]],
@@ -136,7 +158,7 @@ export async function getAll(req, res) {
 export async function create(req, res) {
   const t = await sequelize.transaction();
   try {
-    const { CED_CLI, CED_EMP, DIR_FAC, items = [] } = req.body || {};
+    const { CED_CLI, CED_EMP, DIR_FAC, ID_EVA_PAR, items = [] } = req.body || {};
 
     if (!CED_CLI) {
       await t.rollback();
@@ -266,6 +288,41 @@ export async function create(req, res) {
       );
     }
 
+    // Si hay evaluación de Parte de Pago aprobada, aplicarla en PAR_PAG_APL
+    let valorPartePago = 0;
+    if (ID_EVA_PAR) {
+      const eva = await EVA_PAR_PAG.findByPk(Number(ID_EVA_PAR), { transaction: t });
+      if (eva && eva.EST_EVA_PAR === "APROBADO") {
+        valorPartePago = Number(eva.VAL_EVA_PAR || 0);
+        await PAR_PAG_APL.create(
+          {
+            NUM_FAC: factura.NUM_FAC,
+            ID_EVA_PAR: eva.ID_EVA_PAR,
+            VAL_APL_PAR: valorPartePago,
+            FEC_APL_PAR: new Date(),
+          },
+          { transaction: t }
+        );
+      }
+    }
+
+    // Registrar movimiento financiero de ingreso en MOV_FIN
+    await MOV_FIN.create(
+      {
+        TIP_MOV_FIN: "INGRESO",
+        MON_MOV_FIN: Math.max(0, Number((total - valorPartePago).toFixed(2))),
+        FEC_MOV_FIN: new Date(),
+        REF_MOV_FIN: "FAC-" + String(factura.NUM_FAC).padStart(5, "0"),
+        DES_MOV_FIN:
+          "Venta POS Factura #" +
+          factura.NUM_FAC +
+          (valorPartePago > 0 ? ` (Parte de Pago -$${valorPartePago.toFixed(2)})` : ""),
+        CED_EMP: cedulaEmpleado,
+        CAT_MOV_FIN: "VENTA_POS",
+      },
+      { transaction: t }
+    );
+
     await t.commit();
     return res.status(201).json(factura);
   } catch (error) {
@@ -346,6 +403,20 @@ export async function patchEstadoFactura(req, res) {
           NUM_DOC_MOV: `FAC-${factura.NUM_FAC}`,
           FEC_MOV: new Date(),
         });
+      }
+
+      try {
+        await MOV_FIN.create({
+          TIP_MOV_FIN: "EGRESO",
+          MON_MOV_FIN: Number(factura.TOT_FAC || 0),
+          FEC_MOV_FIN: new Date(),
+          REF_MOV_FIN: "FAC-" + String(factura.NUM_FAC).padStart(5, "0"),
+          DES_MOV_FIN: "Anulación de Factura #" + factura.NUM_FAC,
+          CED_EMP: factura.CED_EMP || null,
+          CAT_MOV_FIN: "ANULACION_FAC",
+        });
+      } catch (e) {
+        console.error("Error registrando reverso en MOV_FIN:", e);
       }
     }
 

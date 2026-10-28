@@ -11,12 +11,13 @@ import {
   MARCAS,
   MODELOS,
   CATEGORIAS,
+  MOV_INV,
 } from "../models/index.js";
 
 // GET /api/reportes/resumen
 export async function getResumen(req, res) {
   try {
-    const [facturasCount, productosCount, clientesCount, serviciosCount, stockAgotado] = await Promise.all([
+    const [facturasCount, productosCount, clientesCount, serviciosCount, stockAgotado, movCount] = await Promise.all([
       FACTURAS.count(),
       PRODUCTOS.count({ where: { ACT_PRO: true } }),
       CLIENTES.count(),
@@ -25,9 +26,10 @@ export async function getResumen(req, res) {
         where: { CAN_DIS_STO: 0 },
         include: [{ model: PRODUCTOS, as: "producto", where: { ACT_PRO: true }, required: true }],
       }),
+      MOV_INV.count(),
     ]);
 
-    const generadosMes = (facturasCount > 0 ? 1 : 0) + (serviciosCount > 0 ? 1 : 0) + 2;
+    const generadosMes = (facturasCount > 0 ? 1 : 0) + (serviciosCount > 0 ? 1 : 0) + 3;
     const pendientes = 0; // Todos los reportes analíticos están generados y disponibles
 
     const recientes = [
@@ -43,6 +45,12 @@ export async function getResumen(req, res) {
         fecha: new Date().toISOString(),
         estado: "LISTO",
         alertas: stockAgotado > 0 ? `${stockAgotado} productos agotados` : "Stock estable",
+      },
+      {
+        id: "rep-kardex-mov",
+        nombre: `Kardex de Movimientos de Inventario (${movCount} registros)`,
+        fecha: new Date().toISOString(),
+        estado: "LISTO",
       },
       {
         id: "rep-servicio-tecnico",
@@ -68,6 +76,7 @@ export async function getResumen(req, res) {
         clientes: clientesCount,
         servicios: serviciosCount,
         stockAgotado,
+        movimientos: movCount,
       },
     });
   } catch (error) {
@@ -79,7 +88,7 @@ export async function getResumen(req, res) {
 // GET /api/reportes/datos
 export async function getDatos(req, res) {
   try {
-    const { tipo } = req.query; // "ventas", "stock", "servicios", "clientes"
+    const { tipo } = req.query; // "ventas", "stock", "movimientos", "servicios", "clientes"
     if (tipo === "ventas") {
       const facturas = await FACTURAS.findAll({
         include: [
@@ -117,6 +126,34 @@ export async function getDatos(req, res) {
       });
       return res.json(stocks);
     }
+    if (tipo === "movimientos") {
+      const movs = await MOV_INV.findAll({
+        include: [
+          {
+            model: PRODUCTOS,
+            as: "producto",
+            attributes: ["ID_PRO", "DES_PRO", "COD_BAR_PRO", "ACT_PRO"],
+            include: [
+              { model: MARCAS, as: "marca", attributes: ["NOM_MAR"], required: false },
+              { model: MODELOS, as: "modelo", attributes: ["NOM_MOD"], required: false },
+              { model: CATEGORIAS, as: "categoria", attributes: ["NOM_CAT"], required: false },
+            ],
+          },
+          {
+            model: EMPLEADOS,
+            as: "empleado",
+            attributes: ["CED_EMP", "NOM_EMP", "APE_EMP"],
+            required: false,
+          },
+        ],
+        order: [
+          ["FEC_MOV", "DESC"],
+          ["ID_MOV", "DESC"],
+        ],
+        limit: 200,
+      });
+      return res.json(movs);
+    }
     if (tipo === "servicios") {
       const servicios = await SER_TEC.findAll({
         include: [
@@ -137,7 +174,7 @@ export async function getDatos(req, res) {
       return res.json(clientes);
     }
 
-    return res.json({ message: "Especifique tipo: ventas, stock, servicios, clientes" });
+    return res.json({ message: "Especifique tipo: ventas, stock, movimientos, servicios, clientes" });
   } catch (error) {
     console.error("reportes.getDatos error:", error);
     return res.status(500).json({ error: error.message });

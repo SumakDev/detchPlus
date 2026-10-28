@@ -63,6 +63,32 @@ export type StockItem = {
   };
 };
 
+export type MovimientoInventario = {
+  ID_MOV: number;
+  ID_PRO: number;
+  TIP_MOV: "ENTRADA" | "SALIDA" | "AJUSTE";
+  CAN_MOV: number;
+  FEC_MOV: string;
+  MOT_MOV?: string | null;
+  NUM_DOC_MOV?: string | null;
+  CED_EMP?: string | null;
+  producto?: {
+    ID_PRO: number;
+    DES_PRO?: string | null;
+    COD_BAR_PRO?: string | null;
+    ID_CAT?: number;
+    ACT_PRO?: boolean;
+    categoria?: { ID_CAT: number; NOM_CAT: string };
+    marca?: { ID_MAR: number; NOM_MAR: string };
+    modelo?: { ID_MOD: string; NOM_MOD: string };
+  };
+  empleado?: {
+    CED_EMP: string;
+    NOM_EMP: string;
+    APE_EMP: string;
+  };
+};
+
 // Utilidad: calcula el estado visual
 export function computeEstado(disponible: number, minimo: number): "OK" | "CRITICO" | "AGOTADO" {
   if (disponible <= 0) return "AGOTADO";

@@ -1,6 +1,6 @@
 import { Op } from "sequelize";
 import sequelize from "../config/database.js";
-import { PRODUCTOS, STOCK, MOV_INV, MARCAS, MODELOS, CATEGORIAS, DET_TELE } from "../models/index.js";
+import { PRODUCTOS, STOCK, MOV_INV, MARCAS, MODELOS, CATEGORIAS, DET_TELE, EMPLEADOS } from "../models/index.js";
 import { computePhoneVariantsSummary } from "./det_tele.controller.js";
 
 // Helpers
@@ -142,17 +142,60 @@ export async function resumen(req, res) {
   }
 }
 
-// GET /stock/movimientos/:idPro? (opcional con ?idPro=)
+// GET /stock/movimientos/:idPro? (opcional con ?idPro=, ?tipMov=, ?q=)
 export async function movimientos(req, res) {
   try {
-    const { idPro } = req.params;
-    const where = idPro ? { ID_PRO: Number(idPro) } : {};
+    const idProParam = req.params.idPro || req.query.idPro;
+    const { tipMov, q } = req.query;
+    const where = {};
+    if (idProParam) where.ID_PRO = Number(idProParam);
+    if (tipMov) where.TIP_MOV = String(tipMov).toUpperCase();
+
     const rows = await MOV_INV.findAll({
       where,
-      order: [["FEC_MOV", "DESC"]],
+      include: [
+        {
+          model: PRODUCTOS,
+          as: "producto",
+          attributes: ["ID_PRO", "DES_PRO", "COD_BAR_PRO", "ID_CAT", "ID_MAR", "ID_MOD", "ACT_PRO"],
+          include: [
+            { model: CATEGORIAS, as: "categoria", attributes: ["ID_CAT", "NOM_CAT"], required: false },
+            { model: MARCAS, as: "marca", attributes: ["ID_MAR", "NOM_MAR"], required: false },
+            { model: MODELOS, as: "modelo", attributes: ["ID_MOD", "NOM_MOD"], required: false },
+          ],
+        },
+        {
+          model: EMPLEADOS,
+          as: "empleado",
+          attributes: ["CED_EMP", "NOM_EMP", "APE_EMP"],
+          required: false,
+        },
+      ],
+      order: [
+        ["FEC_MOV", "DESC"],
+        ["ID_MOV", "DESC"],
+      ],
       limit: 300,
     });
-    return res.json(rows);
+
+    let data = rows.map((r) => r.get({ plain: true }));
+    if (q) {
+      const term = String(q).toLowerCase();
+      data = data.filter((m) => {
+        const p = m.producto || {};
+        return (
+          String(m.ID_PRO).includes(term) ||
+          (m.MOT_MOV || "").toLowerCase().includes(term) ||
+          (m.NUM_DOC_MOV || "").toLowerCase().includes(term) ||
+          (p.DES_PRO || "").toLowerCase().includes(term) ||
+          (p.COD_BAR_PRO || "").toLowerCase().includes(term) ||
+          (p.marca?.NOM_MAR || "").toLowerCase().includes(term) ||
+          (p.modelo?.NOM_MOD || "").toLowerCase().includes(term)
+        );
+      });
+    }
+
+    return res.json(data);
   } catch (error) {
     console.error("stock.movimientos", error);
     return res.status(500).json({ error: "Internal server error" });

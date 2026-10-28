@@ -1,8 +1,16 @@
-import { EVA_PAR_PAG } from "../models/index.js";
+import { EVA_PAR_PAG, CLIENTES, PRODUCTOS, EMPLEADOS, PAR_PAG_APL } from "../models/index.js";
 
 export async function getAll(req, res) {
   try {
-    const data = await EVA_PAR_PAG.findAll();
+    const data = await EVA_PAR_PAG.findAll({
+      include: [
+        { model: CLIENTES, as: "cliente" },
+        { model: PRODUCTOS, as: "producto" },
+        { model: EMPLEADOS, as: "empleado" },
+        { model: PAR_PAG_APL, as: "aplicaciones" },
+      ],
+      order: [["FEC_EVA_PAR", "DESC"]],
+    });
     return res.json(data);
   } catch (error) {
     return res.status(500).json({ error: error.message });
@@ -11,7 +19,14 @@ export async function getAll(req, res) {
 
 export async function getOne(req, res) {
   try {
-    const data = await EVA_PAR_PAG.findByPk(req.params.id);
+    const data = await EVA_PAR_PAG.findByPk(req.params.id, {
+      include: [
+        { model: CLIENTES, as: "cliente" },
+        { model: PRODUCTOS, as: "producto" },
+        { model: EMPLEADOS, as: "empleado" },
+        { model: PAR_PAG_APL, as: "aplicaciones" },
+      ],
+    });
     return data ? res.json(data) : res.status(404).json({ error: "No encontrado" });
   } catch (error) {
     return res.status(500).json({ error: error.message });

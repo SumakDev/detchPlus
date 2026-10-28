@@ -36,7 +36,7 @@ import tecnicosRouter from "./tecnicos.routes.js";
 import usuariosRouter from "./usuarios.routes.js";
 import authRouter from "./auth.routes.js";
 import catalogosRouter from "./catalogos.routers.js";
-import { requireAuth, denyWebUser, requireRoles } from "../middleware/auth.js";
+import { requireAuth, denyWebUser } from "../middleware/auth.js";
 import servicioTecnicoRouter from "./servicio-tecnico.routes.js";
 import ventasRouter from "./ventas.routes.js";
 import reportesRouter from "./reportes.routes.js";
@@ -62,7 +62,7 @@ export default function registerRoutes(app) {
   app.use("/api/empleados", requireAuth(), denyWebUser(), empleadosRouter);
   app.use("/api/eva_par_pag", requireAuth(), denyWebUser(), eva_par_pagRouter);
   app.use("/api/facturas", requireAuth(), denyWebUser(), facturasRouter);
-  app.use("/api/lis_des", requireAuth(), denyWebUser(), lis_desRouter);
+  app.use("/api/lis_des", lis_desRouter);
   app.use("/api/log_act_usu", requireAuth(), denyWebUser(), log_act_usuRouter);
   app.use("/api/marcas", requireAuth(), denyWebUser(), marcasRouter);
   app.use("/api/modelos", requireAuth(), denyWebUser(), modelosRouter);
@@ -75,7 +75,7 @@ export default function registerRoutes(app) {
   app.use("/api/precios", requireAuth(), denyWebUser(), preciosRouter);
   app.use("/api/productos", productosRouter);
   app.use("/api/proveedores", requireAuth(), denyWebUser(), proveedoresRouter);
-  app.use("/api/res_pro", requireAuth(), denyWebUser(), res_proRouter);
+  app.use("/api/res_pro", res_proRouter);
   app.use("/api/roles", requireAuth(), denyWebUser(), rolesRouter);
   app.use("/api/ser_tec", requireAuth(), denyWebUser(), ser_tecRouter);
   app.use("/api/ses_usu", requireAuth(), denyWebUser(), ses_usuRouter);

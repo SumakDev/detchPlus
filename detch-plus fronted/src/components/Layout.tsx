@@ -19,9 +19,9 @@ import {
   LogOut,
   Package2,
   UserCog,
-  Users2,
   UserSquare,
   Store,
+  Wallet,
 } from "lucide-react";
 
 interface LayoutProps {
@@ -41,14 +41,13 @@ export default function Layout({ children }: LayoutProps) {
     { name: "Stock", href: "/stock", icon: Package },
     { name: "Ventas", href: "/ventas", icon: ShoppingCart },
     { name: "Clientes", href: "/clientes", icon: Users },
+    { name: "Operaciones & Finanzas", href: "/operaciones", icon: Wallet },
     { name: "Reportes", href: "/reportes", icon: FileText },
     { name: "Productos", href: "/productos", icon: Package2 },
     { name: "Servicio Técnico", href: "/servicio-tecnico", icon: Settings },
     { name: "Técnicos", href: "/tecnicos", icon: UserCog },
     { name: "Usuarios", href: "/usuarios", icon: UserSquare },
-    
   ];
-
 
   // Derivar estilos desde accesibilidad
   const fontClass =
@@ -98,6 +97,7 @@ export default function Layout({ children }: LayoutProps) {
       stock: "Control de Inventario",
       ventas: "Punto de Venta",
       clientes: "Gestión de Clientes",
+      operaciones: "Operaciones, Finanzas & Auditoría",
       reportes: "Métricas & Reportes",
       productos: "Catálogo de Productos",
       "servicio-tecnico": "Servicio Técnico & Taller",

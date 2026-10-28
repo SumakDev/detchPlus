@@ -13,6 +13,10 @@ import {
   FACTURAS,
   DET_FAC,
   USUARIOS,
+  CUPONES,
+  CUP_USO,
+  MOV_FIN,
+  NOTIF,
 } from "../models/index.js";
 import sequelize from "../config/database.js";
 import { Op } from "sequelize";
@@ -285,7 +289,25 @@ export async function create(req, res) {
     }
 
     const impuesto = Number((subtotal * 0.15).toFixed(2)); // IVA 15% Ecuador
-    const total = Number((subtotal + impuesto).toFixed(2));
+    let descuentoCupon = 0;
+    let cuponEncontrado = null;
+    if (body.codigoCupon) {
+      const code = String(body.codigoCupon).trim().toUpperCase();
+      cuponEncontrado = await CUPONES.findOne({
+        where: { COD_CUP: code, ACT_CUP: true },
+        transaction: t,
+      });
+      if (cuponEncontrado) {
+        if (cuponEncontrado.TIP_DES_CUP === "PORCENTAJE") {
+          descuentoCupon = Number(((subtotal * Number(cuponEncontrado.VAL_DES_CUP || 0)) / 100).toFixed(2));
+        } else {
+          descuentoCupon = Number(Number(cuponEncontrado.VAL_DES_CUP || 0).toFixed(2));
+        }
+        if (descuentoCupon > subtotal) descuentoCupon = subtotal;
+      }
+    }
+
+    const total = Math.max(0, Number((subtotal - descuentoCupon + impuesto).toFixed(2)));
     const maxOrder = await PED_ONL.max("ID_PED_ONL", { transaction: t });
     const nextNum = (Number(maxOrder) || 0) + 1;
     const numPedido = `PED-${new Date().getFullYear()}${String(nextNum).padStart(6, "0")}`;
@@ -299,7 +321,7 @@ export async function create(req, res) {
       SUB_PED_ONL: subtotal,
       IMP_PED_ONL: impuesto,
       COS_ENV_PED: 0.00,
-      DES_PED_ONL: 0.00,
+      DES_PED_ONL: descuentoCupon,
       TOT_PED_ONL: total,
       EST_PED_ONL: "PENDIENTE",
       MET_PAG_PED: ["EFECTIVO", "TRANSFERENCIA", "TARJ_CRED", "TARJ_DEB", "PAYPAL"].includes(metodoPago)
@@ -311,6 +333,23 @@ export async function create(req, res) {
     };
 
     const createdOrder = await PED_ONL.create(orderPayload, { transaction: t });
+
+    if (cuponEncontrado && descuentoCupon > 0) {
+      await cuponEncontrado.update(
+        { USO_ACT_CUP: Number(cuponEncontrado.USO_ACT_CUP || 0) + 1 },
+        { transaction: t }
+      );
+      await CUP_USO.create(
+        {
+          ID_CUP: cuponEncontrado.ID_CUP,
+          ID_USU: userId,
+          ID_PED_ONL: createdOrder.ID_PED_ONL,
+          MON_DES_CUP_USO: descuentoCupon,
+          FEC_USO_CUP: new Date(),
+        },
+        { transaction: t }
+      );
+    }
 
     // 5. Guardar detalles de pedido y descontar inventario en STOCK (y DET_TELE si es teléfono)
     const createdItems = [];
@@ -461,6 +500,32 @@ export async function create(req, res) {
       { transaction: t }
     );
 
+    // 8. Registrar movimiento financiero en MOV_FIN y notificación en NOTIF
+    await MOV_FIN.create(
+      {
+        TIP_MOV_FIN: orderPayload.EST_PAG_PED === "PAGADO" ? "INGRESO" : "POR_COBRAR",
+        MON_MOV_FIN: total,
+        FEC_MOV_FIN: new Date(),
+        REF_MOV_FIN: numPedido,
+        DES_MOV_FIN: "Pedido Online " + numPedido,
+        CED_EMP: cedulaEmpleado,
+        CAT_MOV_FIN: "VENTA_ONLINE",
+      },
+      { transaction: t }
+    );
+
+    await NOTIF.create(
+      {
+        ID_USU: userId,
+        TIT_NOTIF: "Pedido " + numPedido + " recibido",
+        MEN_NOTIF: "Tu pedido por $" + total.toFixed(2) + " ha sido registrado. Código de seguimiento: " + codSeguimiento,
+        TIP_NOTIF: "SUCCESS",
+        URL_ACC_NOTIF: "/recibo/" + numPedido,
+        FEC_CRE_NOTIF: new Date(),
+      },
+      { transaction: t }
+    );
+
     await t.commit();
 
     // Enviar recibo digital por correo al cliente de forma asíncrona
@@ -576,6 +641,35 @@ export async function patchEstado(req, res) {
           FEC_MOV: new Date(),
         });
       }
+
+      // Registrar EGRESO financiero por reverso de pedido
+      try {
+        await MOV_FIN.create({
+          TIP_MOV_FIN: "EGRESO",
+          MON_MOV_FIN: Number(order.TOT_PED_ONL || 0),
+          FEC_MOV_FIN: new Date(),
+          REF_MOV_FIN: order.NUM_PED_ONL,
+          DES_MOV_FIN: "Reverso por cancelación de pedido " + order.NUM_PED_ONL,
+          CAT_MOV_FIN: "REVERSO_ONLINE",
+        });
+      } catch (e) {
+        console.error("Error registrando reverso en MOV_FIN:", e);
+      }
+
+      if (order.ID_USU) {
+        try {
+          await NOTIF.create({
+            ID_USU: order.ID_USU,
+            TIT_NOTIF: "Pedido " + order.NUM_PED_ONL + " cancelado",
+            MEN_NOTIF: "Tu pedido " + order.NUM_PED_ONL + " ha sido cancelado.",
+            TIP_NOTIF: "WARNING",
+            URL_ACC_NOTIF: "/recibo/" + order.NUM_PED_ONL,
+            FEC_CRE_NOTIF: new Date(),
+          });
+        } catch (e) {
+          console.error("Error registrando notificación de cancelación:", e);
+        }
+      }
     }
 
     // 2. Si el pedido se confirma o paga, y tiene factura asociada, actualizar estado de la factura a PAGADA
@@ -585,6 +679,27 @@ export async function patchEstado(req, res) {
       if (match && match[1]) {
         const numFac = parseInt(match[1], 10);
         await FACTURAS.update({ EST_FAC: "PAGADA" }, { where: { NUM_FAC: numFac } });
+      }
+    }
+
+    // Notificar cambios de estado positivos al usuario
+    if (
+      order.ID_USU &&
+      EST_PED_ONL &&
+      EST_PED_ONL !== previousEstado &&
+      ["CONFIRMADO", "ENVIADO", "ENTREGADO"].includes(EST_PED_ONL)
+    ) {
+      try {
+        await NOTIF.create({
+          ID_USU: order.ID_USU,
+          TIT_NOTIF: `Pedido ${order.NUM_PED_ONL}: ${EST_PED_ONL}`,
+          MEN_NOTIF: `El estado de tu pedido ${order.NUM_PED_ONL} ahora es ${EST_PED_ONL}.`,
+          TIP_NOTIF: EST_PED_ONL === "ENTREGADO" ? "SUCCESS" : "INFO",
+          URL_ACC_NOTIF: "/recibo/" + order.NUM_PED_ONL,
+          FEC_CRE_NOTIF: new Date(),
+        });
+      } catch (e) {
+        console.error("Error registrando notificación de estado:", e);
       }
     }
 
