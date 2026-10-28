@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import StockKpis from "@/components/stock/StockKpis";
 import StockTable from "@/components/stock/StockTable";
 import AdjustStockDialog from "@/components/stock/AdjustStockDialog";
+import PhoneUnitsStockDialog from "@/components/stock/PhoneUnitsStockDialog";
 import type { StockItem } from "@/types/stock";
+import { formatEstadoProducto } from "@/types/product";
 import { fetchStock, postAjusteDisponible, putMinMax } from "@/lib/api/stock";
 
 export default function StockPage() {
@@ -19,6 +21,9 @@ export default function StockPage() {
 
   const [openAdjust, setOpenAdjust] = useState(false);
   const [rowAdjust, setRowAdjust] = useState<StockItem | null>(null);
+
+  const [openPhoneUnits, setOpenPhoneUnits] = useState(false);
+  const [phoneUnitsItemId, setPhoneUnitsItemId] = useState<string | null>(null);
 
   async function load() {
     try {
@@ -42,6 +47,11 @@ export default function StockPage() {
     return items.filter((r) => r.producto?.activo !== false);
   }, [items]);
 
+  const currentPhoneUnitsItem = useMemo(() => {
+    if (!phoneUnitsItemId) return null;
+    return activeItems.find((r) => r.id === phoneUnitsItemId) || null;
+  }, [activeItems, phoneUnitsItemId]);
+
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return activeItems.filter((r) => {
@@ -56,6 +66,7 @@ export default function StockPage() {
         !term ||
         r.producto?.nombre?.toLowerCase().includes(term) ||
         (r.producto?.codigo || "").toLowerCase().includes(term) ||
+        (r.producto?.categoria || "").toLowerCase().includes(term) ||
         r.id.toString().includes(term) ||
         matchPhoneUnit;
 
@@ -79,17 +90,42 @@ export default function StockPage() {
   function exportCsv() {
     const escapeCsv = (val: any) => `"${String(val ?? "").replace(/"/g, '""')}"`;
     const rows = [
-      ["ID", "Código", "Producto", "Ubicación", "Estado", "Disponible", "Reservado", "Mínimo"],
-      ...filtered.map((r) => [
-        r.id,
-        r.producto?.codigo || "S/C",
-        r.producto?.nombre || `Producto #${r.id}`,
-        r.ubicacion || "Bodega Central",
-        r.estado || "OK",
-        r.disponible,
-        r.reservado,
-        r.minimo,
-      ]),
+      [
+        "ID",
+        "Código",
+        "Producto",
+        "Categoría",
+        "Clasificación",
+        "Colores y Almacenamiento",
+        "Ubicación",
+        "Estado Stock",
+        "Disponible",
+        "Reservado",
+        "Mínimo",
+      ],
+      ...filtered.map((r) => {
+        const desglose =
+          (r.producto?.resumenVariantes || [])
+            .map(
+              (v) =>
+                `${v.disponibles}x ${v.color} ${v.almacenamiento} (${formatEstadoProducto(v.estadoFisico)})`
+            )
+            .join(" | ") || "General";
+
+        return [
+          r.id,
+          r.producto?.codigo || "S/C",
+          r.producto?.nombre || `Producto #${r.id}`,
+          r.producto?.categoria || "General",
+          formatEstadoProducto(r.producto?.estadoFisico) || "Nuevo",
+          desglose,
+          r.ubicacion || "Bodega Central",
+          r.estado || "OK",
+          r.disponible,
+          r.reservado,
+          r.minimo,
+        ];
+      }),
     ];
 
     const csvLines = rows.map((row) => row.map(escapeCsv).join(";"));
@@ -110,7 +146,9 @@ export default function StockPage() {
         {/* Header */}
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Gestión de Stock</h1>
-          <p className="text-gray-600">Controla existencias, mínimos y ajustes</p>
+          <p className="text-gray-600">
+            Controla existencias, desglose por color/almacenamiento en teléfonos, mínimos y ajustes
+          </p>
         </div>
 
         {/* KPIs */}
@@ -118,12 +156,12 @@ export default function StockPage() {
 
         {/* Filtros */}
         <div className="bg-white border rounded-lg p-3 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-          <div className="flex gap-3 items-center">
+          <div className="flex flex-wrap gap-3 items-center">
             <Input
-              placeholder="Buscar por nombre, código o ID"
+              placeholder="Buscar por nombre, color, almacenamiento, IMEI o código..."
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              className="w-64"
+              className="w-80"
             />
             <select
               value={estado}
@@ -135,11 +173,17 @@ export default function StockPage() {
               <option value="agotados">Agotados</option>
               <option value="ok">OK</option>
             </select>
-            <Button variant="outline" onClick={load}>Aplicar</Button>
+            <Button variant="outline" onClick={load}>
+              Aplicar
+            </Button>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={exportCsv}>Exportar CSV</Button>
-            <Button variant="outline" onClick={() => window.location.reload()}>Refrescar</Button>
+            <Button variant="outline" onClick={exportCsv}>
+              Exportar CSV
+            </Button>
+            <Button variant="outline" onClick={load}>
+              Refrescar
+            </Button>
           </div>
         </div>
 
@@ -159,6 +203,10 @@ export default function StockPage() {
               setRowAdjust(row);
               setOpenAdjust(true);
             }}
+            onManagePhoneUnits={(row) => {
+              setPhoneUnitsItemId(row.id);
+              setOpenPhoneUnits(true);
+            }}
             onUpdateMin={async (row) => {
               const val = prompt(`Nuevo mínimo para "${row.producto?.nombre || row.id}"`, String(row.minimo));
               if (val == null) return;
@@ -177,7 +225,7 @@ export default function StockPage() {
           />
         )}
 
-        {/* Modal de ajuste */}
+        {/* Modal de ajuste (para productos generales que no son teléfonos) */}
         <AdjustStockDialog
           open={openAdjust}
           setOpen={setOpenAdjust}
@@ -195,6 +243,14 @@ export default function StockPage() {
               alert(e?.message || "No se pudo aplicar el ajuste");
             }
           }}
+        />
+
+        {/* Modal de Gestión de Equipos de Teléfono (Color / Almacenamiento / Clasificación / IMEI) */}
+        <PhoneUnitsStockDialog
+          open={openPhoneUnits}
+          setOpen={setOpenPhoneUnits}
+          item={currentPhoneUnitsItem}
+          onUpdated={load}
         />
       </div>
     </Layout>

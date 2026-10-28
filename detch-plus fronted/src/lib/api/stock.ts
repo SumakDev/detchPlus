@@ -1,4 +1,5 @@
 import { dbToUi, type StockDb, type StockFilters, type StockItem } from "@/types/stock";
+import type { DetalleTelefono } from "@/types/product";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -14,7 +15,9 @@ function getAuthHeaders(): Record<string, string> {
 async function handleJson(res: Response) {
   const text = await res.text();
   let json: any = null;
-  try { json = text ? JSON.parse(text) : null; } catch {}
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {}
   if (!res.ok) {
     const msg = json?.error || json?.message || text || `HTTP ${res.status}`;
     const err = new Error(msg) as Error & { status?: number; details?: any };
@@ -25,13 +28,11 @@ async function handleJson(res: Response) {
   return json;
 }
 
-// Igual que en products: base para /uploads
 function filesBaseUrl() {
   if (!API) return "";
   return API.replace(/\/api\/?$/, "") + "/uploads";
 }
 
-// Convierte item.producto.img a URL absoluta si es filename
 function absolutizeImage(item: StockItem): StockItem {
   const img = item.producto?.img;
   if (!img) return item;
@@ -42,7 +43,6 @@ function absolutizeImage(item: StockItem): StockItem {
   };
 }
 
-// Lista de stock con mapeo a StockItem
 export async function fetchStock(params?: StockFilters & { page?: number; limit?: number }): Promise<StockItem[]> {
   const qs = new URLSearchParams();
   if (params?.q) qs.set("q", params.q);
@@ -59,7 +59,7 @@ export async function fetchStock(params?: StockFilters & { page?: number; limit?
   return rows.map(dbToUi).map(absolutizeImage);
 }
 
-// AJUSTE sobre disponible
+// AJUSTE sobre disponible (solo para productos no serializados / no teléfonos)
 export async function postAjusteDisponible(
   idPro: number | string,
   delta: number,
@@ -69,6 +69,37 @@ export async function postAjusteDisponible(
     method: "POST",
     headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify({ idPro, delta, ...extra }),
+  });
+  return handleJson(res);
+}
+
+// Registrar una o varias unidades físicas de teléfono en DET_TELE (sincroniza stock automáticamente)
+export async function postCreatePhoneUnits(
+  payload: Partial<DetalleTelefono> & { ID_PRO: number | string; cantidad?: number }
+) {
+  const res = await fetch(`${API}/det_tele`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify(payload),
+  });
+  return handleJson(res);
+}
+
+// Actualizar una unidad física de teléfono en DET_TELE (color, almacenamiento, estado, disponibilidad, IMEI)
+export async function putUpdatePhoneUnit(idDetTel: number | string, payload: Partial<DetalleTelefono>) {
+  const res = await fetch(`${API}/det_tele/${encodeURIComponent(String(idDetTel))}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify(payload),
+  });
+  return handleJson(res);
+}
+
+// Eliminar una unidad física de teléfono en DET_TELE
+export async function deletePhoneUnit(idDetTel: number | string) {
+  const res = await fetch(`${API}/det_tele/${encodeURIComponent(String(idDetTel))}`, {
+    method: "DELETE",
+    headers: { ...getAuthHeaders() },
   });
   return handleJson(res);
 }
@@ -83,7 +114,6 @@ export async function putMinMax(idPro: number | string, min: number, max?: numbe
   return handleJson(res);
 }
 
-// Opcionales…
 export async function putUbicacion(idPro: number | string, ubicacion: string) {
   const res = await fetch(`${API}/stock/ubicacion/${encodeURIComponent(String(idPro))}`, {
     method: "PUT",

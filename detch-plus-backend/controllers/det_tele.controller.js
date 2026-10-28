@@ -136,51 +136,73 @@ export async function create(req, res) {
       return res.status(404).json({ error: "El producto asociado no existe o está inactivo" });
     }
 
-    const imei = body.IME_TEL ? String(body.IME_TEL).trim() : null;
-    if (imei) {
-      const existingImei = await DET_TELE.findOne({ where: { IME_TEL: imei }, transaction: t });
-      if (existingImei) {
+    const cantidad = Math.max(1, Math.min(50, Number(body.cantidad || 1)));
+    const rawImeis = body.IME_TEL
+      ? String(body.IME_TEL)
+          .split(/[,\n;]+/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+
+    if (rawImeis.length > 0) {
+      const uniqueCheck = new Set(rawImeis.map((i) => i.toLowerCase()));
+      if (uniqueCheck.size !== rawImeis.length) {
         await t.rollback();
-        return res.status(400).json({ error: `Ya existe un teléfono registrado con el IMEI "${imei}"` });
+        return res.status(400).json({ error: "Hay IMEIs duplicados en el ingreso solicitado" });
+      }
+      for (const imei of rawImeis) {
+        const existingImei = await DET_TELE.findOne({ where: { IME_TEL: imei }, transaction: t });
+        if (existingImei) {
+          await t.rollback();
+          return res.status(400).json({ error: `Ya existe un teléfono registrado con el IMEI "${imei}"` });
+        }
       }
     }
 
-    const created = await DET_TELE.create(
-      {
-        ID_PRO: idPro,
-        IME_TEL: imei,
-        COL_TEL: body.COL_TEL ? String(body.COL_TEL).trim() : null,
-        ALM_TEL: body.ALM_TEL ? String(body.ALM_TEL).trim() : null,
-        EST_FIS_TEL: body.EST_FIS_TEL || prod.EST_PRO || "NUEVO",
-        ORG_TEL: body.ORG_TEL || prod.ORG_PRO || "COMPRA_NUEVA",
-        EST_BAT_TEL: clampScore(body.EST_BAT_TEL, 10),
-        EST_PAN_TEL: clampScore(body.EST_PAN_TEL, 10),
-        EST_CAR_TEL: clampScore(body.EST_CAR_TEL, 10),
-        EST_CAM_TEL: clampScore(body.EST_CAM_TEL, 10),
-        EST_SOF_TEL: clampScore(body.EST_SOF_TEL, 10),
-        ACC_INC_TEL: body.ACC_INC_TEL ? String(body.ACC_INC_TEL).trim() : null,
-        DIS_TEL: body.DIS_TEL || "DISPONIBLE",
-        FEC_ING_TEL: new Date(),
-      },
-      { transaction: t }
-    );
+    const totalToCreate = Math.max(cantidad, rawImeis.length);
+    const createdUnits = [];
+
+    for (let i = 0; i < totalToCreate; i++) {
+      const unitImei = rawImeis[i] || null;
+      const created = await DET_TELE.create(
+        {
+          ID_PRO: idPro,
+          IME_TEL: unitImei,
+          COL_TEL: body.COL_TEL ? String(body.COL_TEL).trim() : null,
+          ALM_TEL: body.ALM_TEL ? String(body.ALM_TEL).trim() : null,
+          EST_FIS_TEL: body.EST_FIS_TEL || prod.EST_PRO || "NUEVO",
+          ORG_TEL: body.ORG_TEL || prod.ORG_PRO || "COMPRA_NUEVA",
+          EST_BAT_TEL: clampScore(body.EST_BAT_TEL, 10),
+          EST_PAN_TEL: clampScore(body.EST_PAN_TEL, 10),
+          EST_CAR_TEL: clampScore(body.EST_CAR_TEL, 10),
+          EST_CAM_TEL: clampScore(body.EST_CAM_TEL, 10),
+          EST_SOF_TEL: clampScore(body.EST_SOF_TEL, 10),
+          ACC_INC_TEL: body.ACC_INC_TEL ? String(body.ACC_INC_TEL).trim() : null,
+          DIS_TEL: body.DIS_TEL || "DISPONIBLE",
+          FEC_ING_TEL: new Date(),
+        },
+        { transaction: t }
+      );
+      createdUnits.push(created);
+    }
 
     await syncPhoneStock(idPro, t);
 
-    if ((created.DIS_TEL || "DISPONIBLE") === "DISPONIBLE") {
+    const first = createdUnits[0];
+    if ((first?.DIS_TEL || "DISPONIBLE") === "DISPONIBLE") {
       await MOV_INV.create(
         {
           ID_PRO: idPro,
           TIP_MOV: "ENTRADA",
-          CAN_MOV: 1,
-          MOT_MOV: `ALTA_TEL (${created.COL_TEL || "S/C"} ${created.ALM_TEL || ""}${imei ? ` IMEI:${imei}` : ""})`.trim(),
+          CAN_MOV: createdUnits.length,
+          MOT_MOV: `ALTA_TEL x${createdUnits.length} (${first.COL_TEL || "S/C"} ${first.ALM_TEL || ""})`.trim(),
         },
         { transaction: t }
       );
     }
 
     await t.commit();
-    return res.status(201).json(created);
+    return res.status(201).json(createdUnits.length === 1 ? createdUnits[0] : createdUnits);
   } catch (error) {
     await t.rollback();
     return res.status(500).json({ error: error.message });

@@ -67,7 +67,7 @@ export async function getAll(req, res) {
         const isPhone =
           Number(plain.producto.ID_CAT) === 1 ||
           plain.producto.categoria?.NOM_CAT?.toUpperCase() === "TELEFONO";
-        if (isPhone && detalles.length > 0) {
+        if (isPhone) {
           plain.CAN_DIS_STO = detalles.filter((d) => (d.DIS_TEL || "DISPONIBLE") === "DISPONIBLE").length;
           plain.CAN_RES_STO = detalles.filter((d) => d.DIS_TEL === "RESERVADO").length;
         }
@@ -168,6 +168,11 @@ export async function entrada(req, res) {
 
     const prod = await PRODUCTOS.findByPk(idPro);
     ensure(prod && prod.ACT_PRO, "El producto no existe o se encuentra inactivo", 400);
+    ensure(
+      Number(prod.ID_CAT) !== 1,
+      "El stock de teléfonos se gestiona por unidades individuales (Color, Almacenamiento, Clasificación e IMEI en DET_TELE), no mediante un ajuste numérico genérico.",
+      400
+    );
 
     const row = await withTx(async (t) => {
       const s = await STOCK.findByPk(idPro, { transaction: t, lock: t.LOCK.UPDATE });
@@ -200,6 +205,11 @@ export async function salida(req, res) {
 
     const prod = await PRODUCTOS.findByPk(idPro);
     ensure(prod && prod.ACT_PRO, "El producto no existe o se encuentra inactivo", 400);
+    ensure(
+      Number(prod.ID_CAT) !== 1,
+      "El stock de teléfonos se gestiona por unidades individuales (Color, Almacenamiento, Clasificación e IMEI en DET_TELE), no mediante un ajuste numérico genérico.",
+      400
+    );
 
     const row = await withTx(async (t) => {
       const s = await STOCK.findByPk(idPro, { transaction: t, lock: t.LOCK.UPDATE });
@@ -232,6 +242,11 @@ export async function reservar(req, res) {
 
     const prod = await PRODUCTOS.findByPk(idPro);
     ensure(prod && prod.ACT_PRO, "El producto no existe o se encuentra inactivo", 400);
+    ensure(
+      Number(prod.ID_CAT) !== 1,
+      "El stock de teléfonos se gestiona por unidades individuales (Color, Almacenamiento, Clasificación e IMEI en DET_TELE), no mediante un ajuste numérico genérico.",
+      400
+    );
 
     const row = await withTx(async (t) => {
       const s = await STOCK.findByPk(idPro, { transaction: t, lock: t.LOCK.UPDATE });
@@ -267,6 +282,11 @@ export async function desreservar(req, res) {
 
     const prod = await PRODUCTOS.findByPk(idPro);
     ensure(prod && prod.ACT_PRO, "El producto no existe o se encuentra inactivo", 400);
+    ensure(
+      Number(prod.ID_CAT) !== 1,
+      "El stock de teléfonos se gestiona por unidades individuales (Color, Almacenamiento, Clasificación e IMEI en DET_TELE), no mediante un ajuste numérico genérico.",
+      400
+    );
 
     const row = await withTx(async (t) => {
       const s = await STOCK.findByPk(idPro, { transaction: t, lock: t.LOCK.UPDATE });
@@ -302,6 +322,11 @@ export async function salidaDesdeReserva(req, res) {
 
     const prod = await PRODUCTOS.findByPk(idPro);
     ensure(prod && prod.ACT_PRO, "El producto no existe o se encuentra inactivo", 400);
+    ensure(
+      Number(prod.ID_CAT) !== 1,
+      "El stock de teléfonos se gestiona por unidades individuales (Color, Almacenamiento, Clasificación e IMEI en DET_TELE), no mediante un ajuste numérico genérico.",
+      400
+    );
 
     const row = await withTx(async (t) => {
       const s = await STOCK.findByPk(idPro, { transaction: t, lock: t.LOCK.UPDATE });
@@ -346,6 +371,11 @@ export async function ajustarDisponible(req, res) {
 
     const prod = await PRODUCTOS.findByPk(idPro);
     ensure(prod && prod.ACT_PRO, "El producto no existe o se encuentra inactivo", 400);
+    ensure(
+      Number(prod.ID_CAT) !== 1,
+      "El stock de teléfonos se gestiona por unidades individuales (Color, Almacenamiento, Clasificación e IMEI en DET_TELE), no mediante un ajuste numérico genérico.",
+      400
+    );
 
     // Detección y bloqueo de doble click accidental (idempotencia en ventana de 2.5s)
     cleanOldAdjustments();

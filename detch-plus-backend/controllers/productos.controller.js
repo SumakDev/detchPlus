@@ -134,10 +134,9 @@ function toUi(row) {
   const resumenVariantes = computePhoneVariantsSummary(detallesTelefono);
 
   const isPhone = Number(plain.ID_CAT) === 1 || plain.categoria?.NOM_CAT?.toUpperCase() === "TELEFONO";
-  const stockDisp =
-    isPhone && detallesTelefono.length > 0
-      ? detallesTelefono.filter((d) => (d.DIS_TEL || "DISPONIBLE") === "DISPONIBLE").length
-      : (plain.stock?.CAN_DIS_STO ?? 0);
+  const stockDisp = isPhone
+    ? detallesTelefono.filter((d) => (d.DIS_TEL || "DISPONIBLE") === "DISPONIBLE").length
+    : (plain.stock?.CAN_DIS_STO ?? 0);
 
   return {
     ...plain,
