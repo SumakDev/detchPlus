@@ -6,6 +6,7 @@ import {
   DIR_USU,
   STOCK,
   PRODUCTOS,
+  DET_TELE,
   MOV_INV,
   CLIENTES,
   EMPLEADOS,
@@ -16,6 +17,7 @@ import {
 import sequelize from "../config/database.js";
 import { Op } from "sequelize";
 import { sendOrderReceiptEmail } from "../services/email.service.js";
+import { syncPhoneStock } from "./det_tele.controller.js";
 
 export async function getAll(req, res) {
   try {
@@ -107,6 +109,47 @@ export async function create(req, res) {
       metodoPago = "EFECTIVO",
       notas = "",
     } = body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      await t.rollback();
+      return res.status(400).json({ error: "El carrito de compras está vacío." });
+    }
+
+    // 0. Validación estricta de disponibilidad y estado activo de cada producto ANTES de crear orden
+    for (const it of items) {
+      const idPro = Number(it.id || it.ID_PRO);
+      const cant = Number(it.cantidad || it.CAN_PED_ONL || 1);
+
+      if (!idPro || cant <= 0) {
+        await t.rollback();
+        return res.status(400).json({ error: "Producto o cantidad inválida en el pedido." });
+      }
+
+      const prod = await PRODUCTOS.findByPk(idPro, { transaction: t });
+      if (!prod || prod.ACT_PRO === false || prod.ACT_PRO === 0) {
+        await t.rollback();
+        return res.status(409).json({
+          error: `El producto "${prod?.DES_PRO || `#${idPro}`}" ya no se encuentra activo en el catálogo. Fue retirado de tu bolsa.`,
+          code: "PRODUCT_INACTIVE",
+          productId: idPro,
+        });
+      }
+
+      const stock = await STOCK.findByPk(idPro, { transaction: t });
+      const disp = Number(stock?.CAN_DIS_STO ?? 0);
+      if (disp < cant) {
+        await t.rollback();
+        return res.status(409).json({
+          error:
+            disp <= 0
+              ? `El producto "${prod.DES_PRO}" se encuentra agotado en este momento.`
+              : `Stock insuficiente para "${prod.DES_PRO}". Disponibles: ${disp}, Solicitados: ${cant}.`,
+          code: "INSUFFICIENT_STOCK",
+          productId: idPro,
+          availableStock: disp,
+        });
+      }
+    }
 
     // 1. Resolver usuario: Autenticado (req.user), existente por email, o nuevo usuario invitado
     let userId = null;
@@ -269,50 +312,76 @@ export async function create(req, res) {
 
     const createdOrder = await PED_ONL.create(orderPayload, { transaction: t });
 
-    // 5. Guardar detalles de pedido y descontar inventario en STOCK
+    // 5. Guardar detalles de pedido y descontar inventario en STOCK (y DET_TELE si es teléfono)
     const createdItems = [];
-    if (items.length > 0) {
-      for (const it of items) {
-        const idPro = it.id || it.ID_PRO;
-        const cant = Number(it.cantidad || it.CAN_PED_ONL || 1);
-        const precio = Number(it.precio || it.PRE_UNI_PED_ONL || 0);
-        const tot = Number((cant * precio).toFixed(2));
+    for (const it of items) {
+      const idPro = Number(it.id || it.ID_PRO);
+      const cant = Number(it.cantidad || it.CAN_PED_ONL || 1);
+      const precio = Number(it.precio || it.PRE_UNI_PED_ONL || 0);
+      const tot = Number((cant * precio).toFixed(2));
 
-        const det = await DET_PED_ONL.create(
-          {
-            ID_PED_ONL: createdOrder.ID_PED_ONL,
-            ID_PRO: idPro,
-            CAN_PED_ONL: cant,
-            PRE_UNI_PED_ONL: precio,
-            PRE_TOT_PED_ONL: tot,
-          },
-          { transaction: t }
-        );
-        createdItems.push(det);
+      const det = await DET_PED_ONL.create(
+        {
+          ID_PED_ONL: createdOrder.ID_PED_ONL,
+          ID_PRO: idPro,
+          CAN_PED_ONL: cant,
+          PRE_UNI_PED_ONL: precio,
+          PRE_TOT_PED_ONL: tot,
+        },
+        { transaction: t }
+      );
+      createdItems.push(det);
 
-        // Descontar inventario disponible y registrar en Kardex (MOV_INV)
+      const prod = await PRODUCTOS.findByPk(idPro, { transaction: t });
+      if (Number(prod?.ID_CAT) === 1) {
+        // Si es teléfono, marcar las primeras N unidades disponibles en DET_TELE como VENDIDO
+        const unidadesDisponibles = await DET_TELE.findAll({
+          where: { ID_PRO: idPro, DIS_TEL: "DISPONIBLE" },
+          order: [["ID_DET_TEL", "ASC"]],
+          limit: cant,
+          transaction: t,
+        });
+
+        if (unidadesDisponibles.length > 0) {
+          for (const u of unidadesDisponibles) {
+            await u.update({ DIS_TEL: "VENDIDO" }, { transaction: t });
+          }
+          await syncPhoneStock(idPro, t);
+        } else {
+          const stock = await STOCK.findByPk(idPro, { transaction: t });
+          if (stock) {
+            await stock.update(
+              {
+                CAN_DIS_STO: Math.max(0, Number(stock.CAN_DIS_STO) - cant),
+                FEC_ACT_STO: new Date(),
+              },
+              { transaction: t }
+            );
+          }
+        }
+      } else {
         const stock = await STOCK.findByPk(idPro, { transaction: t });
-        if (stock && Number(stock.CAN_DIS_STO) >= cant) {
+        if (stock) {
           await stock.update(
             {
-              CAN_DIS_STO: Number(stock.CAN_DIS_STO) - cant,
+              CAN_DIS_STO: Math.max(0, Number(stock.CAN_DIS_STO) - cant),
               FEC_ACT_STO: new Date(),
-            },
-            { transaction: t }
-          );
-
-          await MOV_INV.create(
-            {
-              ID_PRO: idPro,
-              TIP_MOV: "SALIDA",
-              CAN_MOV: cant,
-              MOT_MOV: `PED_ONL_${createdOrder.NUM_PED_ONL}`,
-              NUM_DOC_MOV: String(createdOrder.NUM_PED_ONL),
             },
             { transaction: t }
           );
         }
       }
+
+      await MOV_INV.create(
+        {
+          ID_PRO: idPro,
+          TIP_MOV: "SALIDA",
+          CAN_MOV: cant,
+          MOT_MOV: `PED_ONL_${createdOrder.NUM_PED_ONL}`,
+          NUM_DOC_MOV: String(createdOrder.NUM_PED_ONL),
+        },
+        { transaction: t }
+      );
     }
 
     // 6. Sincronizar o crear en CLIENTES para permitir la emisión de FACTURAS
@@ -462,15 +531,39 @@ export async function patchEstado(req, res) {
       // Reingresar stock disponible y ajustar stock reservado
       const items = await DET_PED_ONL.findAll({ where: { ID_PED_ONL: order.ID_PED_ONL } });
       for (const it of items) {
-        const stock = await STOCK.findByPk(it.ID_PRO);
-        if (stock) {
-          const newDisp = Number(stock.CAN_DIS_STO) + Number(it.CAN_PED_ONL);
-          const newRes = Math.max(0, Number(stock.CAN_RES_STO) - Number(it.CAN_PED_ONL));
-          await stock.update({
-            CAN_DIS_STO: newDisp,
-            CAN_RES_STO: newRes,
-            FEC_ACT_STO: new Date(),
+        const prod = await PRODUCTOS.findByPk(it.ID_PRO);
+        if (Number(prod?.ID_CAT) === 1) {
+          const vendidas = await DET_TELE.findAll({
+            where: { ID_PRO: it.ID_PRO, DIS_TEL: "VENDIDO" },
+            order: [["ID_DET_TEL", "DESC"]],
+            limit: Number(it.CAN_PED_ONL || 1),
           });
+          if (vendidas.length > 0) {
+            for (const u of vendidas) {
+              await u.update({ DIS_TEL: "DISPONIBLE" });
+            }
+            await syncPhoneStock(it.ID_PRO);
+          } else {
+            const stock = await STOCK.findByPk(it.ID_PRO);
+            if (stock) {
+              await stock.update({
+                CAN_DIS_STO: Number(stock.CAN_DIS_STO) + Number(it.CAN_PED_ONL),
+                CAN_RES_STO: Math.max(0, Number(stock.CAN_RES_STO) - Number(it.CAN_PED_ONL)),
+                FEC_ACT_STO: new Date(),
+              });
+            }
+          }
+        } else {
+          const stock = await STOCK.findByPk(it.ID_PRO);
+          if (stock) {
+            const newDisp = Number(stock.CAN_DIS_STO) + Number(it.CAN_PED_ONL);
+            const newRes = Math.max(0, Number(stock.CAN_RES_STO) - Number(it.CAN_PED_ONL));
+            await stock.update({
+              CAN_DIS_STO: newDisp,
+              CAN_RES_STO: newRes,
+              FEC_ACT_STO: new Date(),
+            });
+          }
         }
 
         // Registrar movimiento de Kardex (ENTRADA por cancelación)

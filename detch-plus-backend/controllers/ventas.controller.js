@@ -1,6 +1,7 @@
 import { Op } from "sequelize";
 import sequelize from "../config/database.js";
-import { FACTURAS, DET_FAC, CLIENTES, EMPLEADOS, PRODUCTOS, STOCK, MOV_INV, PED_ONL } from "../models/index.js";
+import { FACTURAS, DET_FAC, CLIENTES, EMPLEADOS, PRODUCTOS, DET_TELE, STOCK, MOV_INV, PED_ONL } from "../models/index.js";
+import { syncPhoneStock } from "./det_tele.controller.js";
 
 // GET /api/ventas/resumen
 export async function getResumen(req, res) {
@@ -137,8 +138,42 @@ export async function create(req, res) {
   try {
     const { CED_CLI, CED_EMP, DIR_FAC, items = [] } = req.body || {};
 
-    if (!CED_CLI) return res.status(400).json({ error: "Cédula de cliente requerida" });
-    if (!items.length) return res.status(400).json({ error: "Debe incluir al menos un producto" });
+    if (!CED_CLI) {
+      await t.rollback();
+      return res.status(400).json({ error: "Cédula de cliente requerida" });
+    }
+    if (!items.length) {
+      await t.rollback();
+      return res.status(400).json({ error: "Debe incluir al menos un producto" });
+    }
+
+    // 0. Validar que todos los productos estén activos y tengan stock suficiente
+    for (const item of items) {
+      const idPro = Number(item.ID_PRO || item.id);
+      const cant = Number(item.CAN_PRO || item.cantidad || 1);
+      if (!idPro || cant <= 0) {
+        await t.rollback();
+        return res.status(400).json({ error: "Producto o cantidad inválida en la factura." });
+      }
+      const prod = await PRODUCTOS.findByPk(idPro, { transaction: t });
+      if (!prod || prod.ACT_PRO === false || prod.ACT_PRO === 0) {
+        await t.rollback();
+        return res.status(409).json({
+          error: `El producto "${prod?.DES_PRO || `#${idPro}`}" está inactivo o eliminado y no puede facturarse.`,
+        });
+      }
+      const stock = await STOCK.findByPk(idPro, { transaction: t });
+      const disp = Number(stock?.CAN_DIS_STO ?? 0);
+      if (disp < cant) {
+        await t.rollback();
+        return res.status(409).json({
+          error:
+            disp <= 0
+              ? `El producto "${prod.DES_PRO}" está agotado.`
+              : `Stock insuficiente para "${prod.DES_PRO}" (Disponibles: ${disp}, Solicitados: ${cant}).`,
+        });
+      }
+    }
 
     // Resolver empleado válido
     let cedulaEmpleado = CED_EMP;
@@ -172,7 +207,7 @@ export async function create(req, res) {
     );
 
     for (const item of items) {
-      const idPro = item.ID_PRO || item.id;
+      const idPro = Number(item.ID_PRO || item.id);
       const cant = Number(item.CAN_PRO || item.cantidad || 1);
       const preUni = Number(item.PRE_UNI_FAC || item.precio || 0);
 
@@ -187,25 +222,48 @@ export async function create(req, res) {
         { transaction: t }
       );
 
-      // Descontar de stock si existe
-      const stock = await STOCK.findByPk(idPro, { transaction: t });
-      if (stock && Number(stock.CAN_DIS_STO) >= cant) {
-        await stock.update(
-          { CAN_DIS_STO: Number(stock.CAN_DIS_STO) - cant, FEC_ACT_STO: new Date() },
-          { transaction: t }
-        );
-
-        await MOV_INV.create(
-          {
-            ID_PRO: idPro,
-            TIP_MOV: "SALIDA",
-            CAN_MOV: cant,
-            MOT_MOV: `VENTA_FAC_${factura.NUM_FAC}`,
-            NUM_DOC_MOV: String(factura.NUM_FAC),
-          },
-          { transaction: t }
-        );
+      const prod = await PRODUCTOS.findByPk(idPro, { transaction: t });
+      if (Number(prod?.ID_CAT) === 1) {
+        const unidadesDisponibles = await DET_TELE.findAll({
+          where: { ID_PRO: idPro, DIS_TEL: "DISPONIBLE" },
+          order: [["ID_DET_TEL", "ASC"]],
+          limit: cant,
+          transaction: t,
+        });
+        if (unidadesDisponibles.length > 0) {
+          for (const u of unidadesDisponibles) {
+            await u.update({ DIS_TEL: "VENDIDO" }, { transaction: t });
+          }
+          await syncPhoneStock(idPro, t);
+        } else {
+          const stock = await STOCK.findByPk(idPro, { transaction: t });
+          if (stock) {
+            await stock.update(
+              { CAN_DIS_STO: Math.max(0, Number(stock.CAN_DIS_STO) - cant), FEC_ACT_STO: new Date() },
+              { transaction: t }
+            );
+          }
+        }
+      } else {
+        const stock = await STOCK.findByPk(idPro, { transaction: t });
+        if (stock) {
+          await stock.update(
+            { CAN_DIS_STO: Math.max(0, Number(stock.CAN_DIS_STO) - cant), FEC_ACT_STO: new Date() },
+            { transaction: t }
+          );
+        }
       }
+
+      await MOV_INV.create(
+        {
+          ID_PRO: idPro,
+          TIP_MOV: "SALIDA",
+          CAN_MOV: cant,
+          MOT_MOV: `VENTA_FAC_${factura.NUM_FAC}`,
+          NUM_DOC_MOV: String(factura.NUM_FAC),
+        },
+        { transaction: t }
+      );
     }
 
     await t.commit();
@@ -247,15 +305,38 @@ export async function patchEstadoFactura(req, res) {
       // 2. Reingresar stock si no fue gestionado por pedido online
       const detFac = await DET_FAC.findAll({ where: { NUM_FAC: factura.NUM_FAC } });
       for (const it of detFac) {
-        const stock = await STOCK.findByPk(it.ID_PRO);
-        if (stock) {
-          const newDisp = Number(stock.CAN_DIS_STO) + Number(it.CAN_PRO);
-          const newRes = ped ? Math.max(0, Number(stock.CAN_RES_STO) - Number(it.CAN_PRO)) : stock.CAN_RES_STO;
-          await stock.update({
-            CAN_DIS_STO: newDisp,
-            CAN_RES_STO: newRes,
-            FEC_ACT_STO: new Date(),
+        const prod = await PRODUCTOS.findByPk(it.ID_PRO);
+        if (Number(prod?.ID_CAT) === 1) {
+          const vendidas = await DET_TELE.findAll({
+            where: { ID_PRO: it.ID_PRO, DIS_TEL: "VENDIDO" },
+            order: [["ID_DET_TEL", "DESC"]],
+            limit: Number(it.CAN_PRO || 1),
           });
+          if (vendidas.length > 0) {
+            for (const u of vendidas) {
+              await u.update({ DIS_TEL: "DISPONIBLE" });
+            }
+            await syncPhoneStock(it.ID_PRO);
+          } else {
+            const stock = await STOCK.findByPk(it.ID_PRO);
+            if (stock) {
+              await stock.update({
+                CAN_DIS_STO: Number(stock.CAN_DIS_STO) + Number(it.CAN_PRO),
+                FEC_ACT_STO: new Date(),
+              });
+            }
+          }
+        } else {
+          const stock = await STOCK.findByPk(it.ID_PRO);
+          if (stock) {
+            const newDisp = Number(stock.CAN_DIS_STO) + Number(it.CAN_PRO);
+            const newRes = ped ? Math.max(0, Number(stock.CAN_RES_STO) - Number(it.CAN_PRO)) : stock.CAN_RES_STO;
+            await stock.update({
+              CAN_DIS_STO: newDisp,
+              CAN_RES_STO: newRes,
+              FEC_ACT_STO: new Date(),
+            });
+          }
         }
         await MOV_INV.create({
           ID_PRO: it.ID_PRO,

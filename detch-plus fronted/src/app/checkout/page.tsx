@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/hooks/useAuth";
-import { Apple, ShoppingBag, ArrowLeft, CheckCircle2, ShieldCheck, Truck, CreditCard, Banknote, Building2, Lock } from "lucide-react";
+import { Apple, ShoppingBag, ArrowLeft, CheckCircle2, ShieldCheck, Truck, Banknote, Building2, Lock, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,7 +41,7 @@ export const ECUADOR_LOCATIONS: Record<string, string[]> = {
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { items, subtotal, iva, total, clearCart } = useCart();
+  const { items, subtotal, iva, total, clearCart, removedNotice, syncCartWithBackend } = useCart();
   const auth = useAuth();
   const isLoggedIn = !!auth.user;
 
@@ -62,6 +62,11 @@ export default function CheckoutPage() {
   const loadingRef = useRef(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [completedOrder, setCompletedOrder] = useState<any | null>(null);
+
+  // Sincronizar disponibilidad real del carrito al entrar a Checkout
+  useEffect(() => {
+    syncCartWithBackend();
+  }, [syncCartWithBackend]);
 
   // Auto-llenado de datos cuando el usuario está logueado
   useEffect(() => {
@@ -135,6 +140,14 @@ export default function CheckoutPage() {
     setLoading(true);
 
     try {
+      // Verificar en tiempo real que todos los productos sigan activos y con stock suficiente
+      const validCart = await syncCartWithBackend();
+      if (!validCart) {
+        throw new Error(
+          "Algunos artículos en tu bolsa ya no están activos o cambiaron de disponibilidad. Revisa el resumen antes de confirmar."
+        );
+      }
+
       const payload = {
         ID_USU: auth.user?.ID_USU || undefined,
         nombreContacto: nombres,
@@ -164,6 +177,9 @@ export default function CheckoutPage() {
 
       const data = await res.json();
       if (!res.ok) {
+        if (res.status === 409) {
+          await syncCartWithBackend();
+        }
         throw new Error(data.error || "No se pudo procesar el pedido.");
       }
 
@@ -257,8 +273,14 @@ export default function CheckoutPage() {
             <ShoppingBag className="w-7 h-7" />
           </div>
           <h2 className="text-xl font-bold text-gray-900">Tu carrito de compras está vacío</h2>
+          {removedNotice && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs text-left flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <span>{removedNotice}</span>
+            </div>
+          )}
           <p className="text-sm text-gray-500">
-            Aún no has seleccionado ningún producto para comprar. Explora nuestro catálogo y agrega lo que necesites.
+            Aún no has seleccionado ningún producto disponible para comprar. Explora nuestro catálogo y agrega lo que necesites.
           </p>
           <Button
             onClick={() => router.push("/")}
@@ -390,7 +412,6 @@ export default function CheckoutPage() {
               </h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* 1. Provincia PRIMERO */}
                 <div>
                   <Label htmlFor="provincia" className="font-semibold text-gray-800">
                     Provincia *
@@ -411,7 +432,6 @@ export default function CheckoutPage() {
                   </select>
                 </div>
 
-                {/* 2. Ciudad / Cantón que depende de la provincia */}
                 <div>
                   <Label htmlFor="ciudad" className="font-semibold text-gray-800">
                     Ciudad / Cantón *
@@ -448,7 +468,6 @@ export default function CheckoutPage() {
                   )}
                 </div>
 
-                {/* 3. Dirección exacta */}
                 <div className="sm:col-span-2">
                   <Label htmlFor="direccion" className="font-semibold text-gray-800">
                     Dirección exacta (Calle y Número) *
@@ -463,7 +482,6 @@ export default function CheckoutPage() {
                   />
                 </div>
 
-                {/* 4. Referencia de entrega */}
                 <div className="sm:col-span-2">
                   <Label htmlFor="referencia" className="font-medium text-gray-700">
                     Referencia de entrega
@@ -526,26 +544,6 @@ export default function CheckoutPage() {
                   <span className="text-sm">Transferencia Bancaria</span>
                   <span className="text-[11px] text-gray-400 mt-1">Pichincha / Guayaquil</span>
                 </label>
-
-                {/* <label
-                  className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition text-center ${
-                    metodoPago === "TARJ_CRED"
-                      ? "border-gray-900 bg-gray-50 text-gray-900 font-semibold"
-                      : "border-gray-200 hover:border-gray-300 text-gray-600"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="metodoPago"
-                    value="TARJ_CRED"
-                    checked={metodoPago === "TARJ_CRED"}
-                    onChange={() => setMetodoPago("TARJ_CRED")}
-                    className="sr-only"
-                  />
-                  <CreditCard className="w-6 h-6 mb-2 text-purple-600" />
-                  <span className="text-sm">Tarjeta Crédito / Débito</span>
-                  <span className="text-[11px] text-gray-400 mt-1">Datafast / Pos</span>
-                </label> */}
               </div>
 
               <div>
@@ -565,6 +563,13 @@ export default function CheckoutPage() {
           <div className="lg:col-span-5">
             <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm sticky top-24 space-y-6">
               <h2 className="text-lg font-bold text-gray-900">Resumen del Pedido</h2>
+
+              {removedNotice && (
+                <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-lg flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <span>{removedNotice}</span>
+                </div>
+              )}
 
               {/* Items List */}
               <div className="divide-y divide-gray-100 max-h-72 overflow-y-auto">
