@@ -16,6 +16,7 @@ import {
   Printer,
   CheckCircle2,
 } from "lucide-react";
+import { formatEstadoProducto } from "@/types/product";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -110,7 +111,7 @@ export default function ReportesPage() {
           marca || "—",
           modelo || "—",
           cat || "—",
-          r.producto?.EST_PRO ?? "NUEVO",
+          formatEstadoProducto(r.producto?.EST_PRO) || "Nuevo",
           disp,
           Number(r.CAN_RES_STO || 0),
           min,

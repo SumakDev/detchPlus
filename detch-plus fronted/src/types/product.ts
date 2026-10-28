@@ -2,6 +2,21 @@
 export type OrigenProducto = "COMPRA_NUEVA" | "PARTE_PAGO" | "CONSIGNACION";
 export type EstadoProducto = "NUEVO" | "USADO_EXCELENTE" | "USADO_BUENO" | "USADO_REGULAR";
 
+export function formatEstadoProducto(estado?: string | null): string {
+  switch (estado) {
+    case "NUEVO":
+      return "Nuevo";
+    case "USADO_EXCELENTE":
+      return "Usado - Excelente";
+    case "USADO_BUENO":
+      return "Usado - Bueno";
+    case "USADO_REGULAR":
+      return "Usado - Regular";
+    default:
+      return estado || "";
+  }
+}
+
 // Relaciones (cuando el backend hace include)
 export type CategoriaRef = { ID_CAT: number; NOM_CAT: string; DES_CAT?: string };
 export type MarcaRef = { ID_MAR: number; NOM_MAR: string; DES_MAR?: string };

@@ -18,10 +18,13 @@ export async function getResumen(req, res) {
   try {
     const [facturasCount, productosCount, clientesCount, serviciosCount, stockAgotado] = await Promise.all([
       FACTURAS.count(),
-      PRODUCTOS.count(),
+      PRODUCTOS.count({ where: { ACT_PRO: true } }),
       CLIENTES.count(),
       SER_TEC.count(),
-      STOCK.count({ where: { CAN_DIS_STO: 0 } }),
+      STOCK.count({
+        where: { CAN_DIS_STO: 0 },
+        include: [{ model: PRODUCTOS, as: "producto", where: { ACT_PRO: true }, required: true }],
+      }),
     ]);
 
     const generadosMes = (facturasCount > 0 ? 1 : 0) + (serviciosCount > 0 ? 1 : 0) + 2;
@@ -100,6 +103,8 @@ export async function getDatos(req, res) {
             model: PRODUCTOS,
             as: "producto",
             attributes: ["ID_PRO", "DES_PRO", "COD_BAR_PRO", "EST_PRO", "ORG_PRO"],
+            where: { ACT_PRO: true },
+            required: true,
             include: [
               { model: MARCAS, as: "marca", attributes: ["NOM_MAR"], required: false },
               { model: MODELOS, as: "modelo", attributes: ["NOM_MOD"], required: false },

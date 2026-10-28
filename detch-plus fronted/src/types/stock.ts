@@ -15,6 +15,8 @@ export type StockDb = {
     IME_PRO?: string | null;
     DES_PRO?: string | null;
     IMG_URL?: string | null;
+    ACT_PRO?: boolean;
+    EST_PRO?: string;
 
     // Relaciones opcionales si haces include:
     marca?: { ID_MAR: number; NOM_MAR: string };
@@ -50,6 +52,8 @@ export type StockItem = {
     img?: string | null;          // URL absoluta o relativa
     imei?: string | null;
     descripcion?: string | null;
+    activo?: boolean;
+    estadoFisico?: string;
   };
 };
 
@@ -97,6 +101,8 @@ export function dbToUi(row: StockDb): StockItem {
         img: p.IMG_URL || null,
         imei: p.IME_PRO || null,
         descripcion: p.DES_PRO || null,
+        activo: p.ACT_PRO !== undefined ? p.ACT_PRO : true,
+        estadoFisico: p.EST_PRO || undefined,
       }
       : undefined,
   };

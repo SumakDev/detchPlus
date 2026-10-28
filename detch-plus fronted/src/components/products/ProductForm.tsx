@@ -158,12 +158,12 @@ export default function ProductForm({
           <Input id="IME_PRO" name="IME_PRO" value={form.IME_PRO} onChange={handleChange} />
         </div>
         <div className="grid gap-2">
-          <Label>Estado</Label>
+          <Label>Estado / Condición</Label>
           <select name="EST_PRO" value={form.EST_PRO} onChange={handleChange} className="border rounded px-2 py-2 text-sm">
-            <option value="NUEVO">NUEVO</option>
-            <option value="USADO_EXCELENTE">USADO_EXCELENTE</option>
-            <option value="USADO_BUENO">USADO_BUENO</option>
-            <option value="USADO_REGULAR">USADO_REGULAR</option>
+            <option value="NUEVO">Nuevo</option>
+            <option value="USADO_EXCELENTE">Usado - Excelente</option>
+            <option value="USADO_BUENO">Usado - Bueno</option>
+            <option value="USADO_REGULAR">Usado - Regular</option>
           </select>
         </div>
       </div>

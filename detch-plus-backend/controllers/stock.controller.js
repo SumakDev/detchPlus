@@ -25,17 +25,32 @@ async function withTx(fn) {
 // GET /stock
 export async function getAll(req, res) {
   try {
-    const { q, estado } = req.query;
+    const { q, estado, activo } = req.query;
+
+    const prodWhere = {};
+    if (activo === "true") {
+      prodWhere.ACT_PRO = true;
+    } else if (activo === "false") {
+      prodWhere.ACT_PRO = false;
+    } else if (activo === "all") {
+      // no filtrar por estado si se solicita all
+    } else {
+      // Por defecto solo productos activos (no eliminados lógicamente)
+      prodWhere.ACT_PRO = true;
+    }
+
     // join para mostrar info del producto
     const rows = await STOCK.findAll({
       include: [
         {
           model: PRODUCTOS,
           as: "producto",
+          where: prodWhere,
+          required: true,
           include: [
-            { model: CATEGORIAS, as: "categoria", attributes: ["ID_CAT", "NOM_CAT"] },
-            { model: MARCAS, as: "marca", attributes: ["ID_MAR", "NOM_MAR"] },
-            { model: MODELOS, as: "modelo", attributes: ["ID_MOD", "NOM_MOD"] },
+            { model: CATEGORIAS, as: "categoria", attributes: ["ID_CAT", "NOM_CAT"], required: false },
+            { model: MARCAS, as: "marca", attributes: ["ID_MAR", "NOM_MAR"], required: false },
+            { model: MODELOS, as: "modelo", attributes: ["ID_MOD", "NOM_MOD"], required: false },
           ],
         },
       ],
@@ -70,7 +85,18 @@ export async function getAll(req, res) {
 // GET /stock/resumen
 export async function resumen(req, res) {
   try {
-    const all = await STOCK.findAll({ attributes: ["CAN_DIS_STO", "STO_MIN", "ID_PRO"] });
+    const all = await STOCK.findAll({
+      attributes: ["CAN_DIS_STO", "STO_MIN", "ID_PRO"],
+      include: [
+        {
+          model: PRODUCTOS,
+          as: "producto",
+          attributes: ["ID_PRO", "ACT_PRO"],
+          where: { ACT_PRO: true },
+          required: true,
+        },
+      ],
+    });
     const totalProductos = all.length;
     const criticos = all.filter((r) => Number(r.CAN_DIS_STO) <= Number(r.STO_MIN) && Number(r.CAN_DIS_STO) > 0).length;
     const agotados = all.filter((r) => Number(r.CAN_DIS_STO) === 0).length;
@@ -118,6 +144,9 @@ export async function entrada(req, res) {
     const n = toInt(cantidad);
     ensure(idPro && n > 0, "idPro y cantidad > 0 son obligatorios");
 
+    const prod = await PRODUCTOS.findByPk(idPro);
+    ensure(prod && prod.ACT_PRO, "El producto no existe o se encuentra inactivo", 400);
+
     const row = await withTx(async (t) => {
       const s = await STOCK.findByPk(idPro, { transaction: t, lock: t.LOCK.UPDATE });
       ensure(s, "No existe stock del producto", 404);
@@ -147,6 +176,9 @@ export async function salida(req, res) {
     const n = toInt(cantidad);
     ensure(idPro && n > 0, "idPro y cantidad > 0 son obligatorios");
 
+    const prod = await PRODUCTOS.findByPk(idPro);
+    ensure(prod && prod.ACT_PRO, "El producto no existe o se encuentra inactivo", 400);
+
     const row = await withTx(async (t) => {
       const s = await STOCK.findByPk(idPro, { transaction: t, lock: t.LOCK.UPDATE });
       ensure(s, "No existe stock del producto", 404);
@@ -175,6 +207,9 @@ export async function reservar(req, res) {
     const { idPro, cantidad, motivo, numDoc, cedEmp } = req.body || {};
     const n = toInt(cantidad);
     ensure(idPro && n > 0, "idPro y cantidad > 0 son obligatorios");
+
+    const prod = await PRODUCTOS.findByPk(idPro);
+    ensure(prod && prod.ACT_PRO, "El producto no existe o se encuentra inactivo", 400);
 
     const row = await withTx(async (t) => {
       const s = await STOCK.findByPk(idPro, { transaction: t, lock: t.LOCK.UPDATE });
@@ -208,6 +243,9 @@ export async function desreservar(req, res) {
     const n = toInt(cantidad);
     ensure(idPro && n > 0, "idPro y cantidad > 0 son obligatorios");
 
+    const prod = await PRODUCTOS.findByPk(idPro);
+    ensure(prod && prod.ACT_PRO, "El producto no existe o se encuentra inactivo", 400);
+
     const row = await withTx(async (t) => {
       const s = await STOCK.findByPk(idPro, { transaction: t, lock: t.LOCK.UPDATE });
       ensure(s, "No existe stock del producto", 404);
@@ -239,6 +277,9 @@ export async function salidaDesdeReserva(req, res) {
     const { idPro, cantidad, motivo, numDoc, cedEmp } = req.body || {};
     const n = toInt(cantidad);
     ensure(idPro && n > 0, "idPro y cantidad > 0 son obligatorios");
+
+    const prod = await PRODUCTOS.findByPk(idPro);
+    ensure(prod && prod.ACT_PRO, "El producto no existe o se encuentra inactivo", 400);
 
     const row = await withTx(async (t) => {
       const s = await STOCK.findByPk(idPro, { transaction: t, lock: t.LOCK.UPDATE });
@@ -280,6 +321,9 @@ export async function ajustarDisponible(req, res) {
     const { idPro, delta, motivo, numDoc, cedEmp } = req.body || {};
     const d = toInt(delta);
     ensure(idPro && d !== 0, "idPro y delta (≠ 0) son obligatorios");
+
+    const prod = await PRODUCTOS.findByPk(idPro);
+    ensure(prod && prod.ACT_PRO, "El producto no existe o se encuentra inactivo", 400);
 
     // Detección y bloqueo de doble click accidental (idempotencia en ventana de 2.5s)
     cleanOldAdjustments();
@@ -324,6 +368,10 @@ export async function actualizarMinMax(req, res) {
     const maxN = max != null ? toInt(max, 0) : null;
     ensure(minN >= 0, "min inválido");
     if (maxN != null) ensure(maxN >= minN, "max debe ser >= min");
+
+    const prod = await PRODUCTOS.findByPk(id);
+    ensure(prod && prod.ACT_PRO, "El producto no existe o se encuentra inactivo", 400);
+
     const s = await STOCK.findByPk(id);
     ensure(s, "No existe stock del producto", 404);
     await s.update({ STO_MIN: minN, ...(maxN != null ? { STO_MAX: maxN } : {}), FEC_ACT_STO: now() });
@@ -339,6 +387,10 @@ export async function actualizarUbicacion(req, res) {
   try {
     const { id } = req.params;
     const { ubicacion } = req.body || {};
+
+    const prod = await PRODUCTOS.findByPk(id);
+    ensure(prod && prod.ACT_PRO, "El producto no existe o se encuentra inactivo", 400);
+
     const s = await STOCK.findByPk(id);
     ensure(s, "No existe stock del producto", 404);
     await s.update({ UBI_STO: ubicacion || null, FEC_ACT_STO: now() });

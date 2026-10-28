@@ -38,9 +38,13 @@ export default function StockPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const activeItems = useMemo(() => {
+    return items.filter((r) => r.producto?.activo !== false);
+  }, [items]);
+
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
-    return items.filter((r) => {
+    return activeItems.filter((r) => {
       const matchesQ =
         !term ||
         r.producto?.nombre?.toLowerCase().includes(term) ||
@@ -55,14 +59,14 @@ export default function StockPage() {
 
       return matchesQ && matchesEstado;
     });
-  }, [items, q, estado]);
+  }, [activeItems, q, estado]);
 
   const kpis = useMemo(() => {
-    const total = items.length;
-    const criticos = items.filter((r) => r.estado === "CRITICO").length;
-    const agotados = items.filter((r) => r.estado === "AGOTADO").length;
+    const total = activeItems.length;
+    const criticos = activeItems.filter((r) => r.estado === "CRITICO").length;
+    const agotados = activeItems.filter((r) => r.estado === "AGOTADO").length;
     return { total, criticos, agotados };
-  }, [items]);
+  }, [activeItems]);
 
   function exportCsv() {
     const escapeCsv = (val: any) => `"${String(val ?? "").replace(/"/g, '""')}"`;

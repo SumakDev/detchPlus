@@ -28,6 +28,7 @@ import ServiceTrackingModal from "@/components/support/ServiceTrackingModal";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/context/CartContext";
 import UserMenu from "@/components/auth/UserMenu";
+import { formatEstadoProducto } from "@/types/product";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { resolveProductImage } from "@/lib/utils";
@@ -95,7 +96,7 @@ export default function CatalogoPage() {
               subtitle: p.DES_PRO || "Dispositivo garantizado y verificado por DetchPlus",
               price: precioVenta > 0 ? `$${precioVenta.toFixed(2)}` : "$499.00",
               rawPrice: precioVenta > 0 ? precioVenta : 499,
-              badge: p.EST_PRO === "NUEVO" ? "Nuevo" : p.EST_PRO || null,
+              badge: formatEstadoProducto(p.EST_PRO) || null,
               badgeColor: "bg-blue-600",
               stock,
               status: stock > 0 ? `En stock (${stock})` : "Agotado",
