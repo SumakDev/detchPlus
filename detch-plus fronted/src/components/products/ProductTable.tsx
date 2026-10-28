@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import type { Producto } from "@/types/product";
+import { formatEstadoProducto } from "@/types/product";
 import { Edit2, Trash2, Tag, Smartphone } from "lucide-react";
 
 export default function ProductTable({
@@ -23,7 +24,7 @@ export default function ProductTable({
 
   return (
     <div>
-      {/* Vista Móvil: Tarjetas Adaptativas (sin scroll horizontal) */}
+      {/* Vista Móvil: Tarjetas Adaptativas */}
       <div className="md:hidden space-y-3">
         {productos.map((p) => (
           <div
@@ -74,6 +75,21 @@ export default function ProductTable({
               </div>
             </div>
 
+            {/* Desglose de variantes de teléfono (Color + Almacenamiento) */}
+            {p.RESUMEN_VARIANTES && p.RESUMEN_VARIANTES.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {p.RESUMEN_VARIANTES.map((v, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200 font-medium"
+                  >
+                    <span className="font-bold">{v.disponibles}x</span> {v.color} • {v.almacenamiento}
+                    <span className="text-[10px] text-blue-600">({formatEstadoProducto(v.estadoFisico)})</span>
+                  </span>
+                ))}
+              </div>
+            )}
+
             {/* Metadatos */}
             <div className="grid grid-cols-2 gap-2 text-xs bg-gray-50/80 rounded-lg p-2 text-gray-600">
               <div>
@@ -115,7 +131,7 @@ export default function ProductTable({
           <thead className="bg-gray-50/75 border-b border-gray-200">
             <tr className="text-left text-xs text-gray-500 uppercase tracking-wider">
               <th className="p-3.5">Imagen</th>
-              <th className="p-3.5">Nombre</th>
+              <th className="p-3.5">Nombre / Variantes (Color • Almacenamiento)</th>
               <th className="p-3.5">Código</th>
               <th className="p-3.5">Marca</th>
               <th className="p-3.5">Modelo</th>
@@ -149,6 +165,19 @@ export default function ProductTable({
                 <td className="p-3.5 font-medium text-gray-900">
                   <div className="font-semibold">{p.NOMBRE}</div>
                   {p.DES_PRO ? <div className="text-xs text-gray-500 truncate max-w-xs">{p.DES_PRO}</div> : null}
+                  {p.RESUMEN_VARIANTES && p.RESUMEN_VARIANTES.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {p.RESUMEN_VARIANTES.map((v, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 font-medium"
+                        >
+                          <span className="font-bold">{v.disponibles}x</span> {v.color} • {v.almacenamiento}
+                          <span className="text-[10px] text-blue-600">({formatEstadoProducto(v.estadoFisico)})</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </td>
                 <td className="p-3.5 text-xs font-mono text-gray-600">{p.COD_BAR_PRO || "—"}</td>
                 <td className="p-3.5 text-gray-700">{p.marca?.NOM_MAR || "—"}</td>

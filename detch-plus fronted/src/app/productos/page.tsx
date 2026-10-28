@@ -57,9 +57,14 @@ export default function ProductosPage() {
       if (!term) return true;
       const byNombre = (p.NOMBRE || "").toLowerCase().includes(term);
       const byCodBar = (p.COD_BAR_PRO || "").toLowerCase().includes(term);
-      const byImei = (p.IME_PRO || "").toLowerCase().includes(term);
       const byId = String(p.ID_PRO).toLowerCase().includes(term);
-      return byNombre || byCodBar || byImei || byId;
+      const byPhoneUnit = (p.detallesTelefono || []).some(
+        (d) =>
+          (d.IME_TEL || "").toLowerCase().includes(term) ||
+          (d.COL_TEL || "").toLowerCase().includes(term) ||
+          (d.ALM_TEL || "").toLowerCase().includes(term)
+      );
+      return byNombre || byCodBar || byId || byPhoneUnit;
     });
   }, [items, q]);
 

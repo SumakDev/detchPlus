@@ -3,7 +3,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { Op } from "sequelize";
 import sequelize from "../config/database.js";
-import { PRODUCTOS, CATEGORIAS, MARCAS, MODELOS, STOCK, PRECIOS } from "../models/index.js";
+import { PRODUCTOS, CATEGORIAS, MARCAS, MODELOS, STOCK, PRECIOS, DET_TELE } from "../models/index.js";
+import { syncPhoneStock, computePhoneVariantsSummary } from "./det_tele.controller.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,7 +13,107 @@ const uploadsDir = path.resolve(__dirname, "..", "uploads");
 function deleteIfExists(filename) {
   if (!filename) return;
   const p = path.join(uploadsDir, filename);
-  fs.promises.stat(p).then(() => fs.promises.unlink(p)).catch(() => { });
+  fs.promises.stat(p).then(() => fs.promises.unlink(p)).catch(() => {});
+}
+
+function clampScore(val, def = 10) {
+  if (val === undefined || val === null || val === "") return def;
+  const n = Number(val);
+  if (!Number.isFinite(n)) return def;
+  return Math.max(1, Math.min(10, Math.round(n)));
+}
+
+function parseDetallesTelefono(raw) {
+  if (!raw) return null;
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+async function syncDetallesTelefonoList(idPro, rawDetalles, defaultEst = "NUEVO", defaultOrg = "COMPRA_NUEVA", transaction = null) {
+  const list = parseDetallesTelefono(rawDetalles);
+  if (!list) return;
+
+  const opts = transaction ? { transaction } : {};
+
+  // Validar IMEIs únicos dentro del lote enviado
+  const seenImeis = new Set();
+  for (const item of list) {
+    const imei = item.IME_TEL ? String(item.IME_TEL).trim() : "";
+    if (imei) {
+      if (seenImeis.has(imei.toLowerCase())) {
+        const err = new Error(`El IMEI "${imei}" está repetido en la lista de unidades del teléfono`);
+        err.status = 400;
+        throw err;
+      }
+      seenImeis.add(imei.toLowerCase());
+    }
+  }
+
+  // Obtener unidades actuales en BD para este producto
+  const existingRows = await DET_TELE.findAll({ where: { ID_PRO: Number(idPro) }, ...opts });
+  const existingIds = new Set(existingRows.map((r) => Number(r.ID_DET_TEL)));
+  const incomingIds = new Set(
+    list.map((x) => (x.ID_DET_TEL ? Number(x.ID_DET_TEL) : null)).filter(Boolean)
+  );
+
+  // Eliminar unidades que fueron quitadas de la lista
+  const toDeleteIds = [...existingIds].filter((id) => !incomingIds.has(id));
+  if (toDeleteIds.length > 0) {
+    await DET_TELE.destroy({
+      where: { ID_DET_TEL: { [Op.in]: toDeleteIds }, ID_PRO: Number(idPro) },
+      ...opts,
+    });
+  }
+
+  // Insertar o actualizar cada unidad
+  for (const item of list) {
+    const idDet = item.ID_DET_TEL ? Number(item.ID_DET_TEL) : null;
+    const imei = item.IME_TEL ? String(item.IME_TEL).trim() : null;
+
+    if (imei) {
+      const dupWhere = idDet
+        ? { IME_TEL: imei, ID_DET_TEL: { [Op.ne]: idDet } }
+        : { IME_TEL: imei };
+      const dup = await DET_TELE.findOne({ where: dupWhere, ...opts });
+      if (dup) {
+        const err = new Error(`Ya existe un teléfono registrado con el IMEI "${imei}"`);
+        err.status = 400;
+        throw err;
+      }
+    }
+
+    const payload = {
+      ID_PRO: Number(idPro),
+      IME_TEL: imei,
+      COL_TEL: item.COL_TEL ? String(item.COL_TEL).trim() : null,
+      ALM_TEL: item.ALM_TEL ? String(item.ALM_TEL).trim() : null,
+      EST_FIS_TEL: item.EST_FIS_TEL || defaultEst || "NUEVO",
+      ORG_TEL: item.ORG_TEL || defaultOrg || "COMPRA_NUEVA",
+      EST_BAT_TEL: clampScore(item.EST_BAT_TEL, 10),
+      EST_PAN_TEL: clampScore(item.EST_PAN_TEL, 10),
+      EST_CAR_TEL: clampScore(item.EST_CAR_TEL, 10),
+      EST_CAM_TEL: clampScore(item.EST_CAM_TEL, 10),
+      EST_SOF_TEL: clampScore(item.EST_SOF_TEL, 10),
+      ACC_INC_TEL: item.ACC_INC_TEL ? String(item.ACC_INC_TEL).trim() : null,
+      DIS_TEL: item.DIS_TEL || "DISPONIBLE",
+    };
+
+    if (idDet && existingIds.has(idDet)) {
+      await DET_TELE.update(payload, { where: { ID_DET_TEL: idDet, ID_PRO: Number(idPro) }, ...opts });
+    } else {
+      await DET_TELE.create({ ...payload, FEC_ING_TEL: new Date() }, opts);
+    }
+  }
+
+  await syncPhoneStock(idPro, transaction);
 }
 
 function computeNombre(row) {
@@ -25,17 +126,37 @@ function computeNombre(row) {
 
 function toUi(row) {
   const plain = row.get ? row.get({ plain: true }) : row;
-  const ventaPrice = plain.precios?.find?.(p => p.TIP_PRE === "VENTA")?.VAL_PRE;
+  const ventaPrice = plain.precios?.find?.((p) => p.TIP_PRE === "VENTA")?.VAL_PRE;
   const anyPrice = plain.precios?.[0]?.VAL_PRE;
   const precio = Number(ventaPrice || anyPrice || 0);
+
+  const detallesTelefono = Array.isArray(plain.detallesTelefono) ? plain.detallesTelefono : [];
+  const resumenVariantes = computePhoneVariantsSummary(detallesTelefono);
+
+  const isPhone = Number(plain.ID_CAT) === 1 || plain.categoria?.NOM_CAT?.toUpperCase() === "TELEFONO";
+  const stockDisp =
+    isPhone && detallesTelefono.length > 0
+      ? detallesTelefono.filter((d) => (d.DIS_TEL || "DISPONIBLE") === "DISPONIBLE").length
+      : (plain.stock?.CAN_DIS_STO ?? 0);
 
   return {
     ...plain,
     NOMBRE: computeNombre(plain),
     PRECIO_VENTA: precio,
-    STOCK_DISPONIBLE: plain.stock?.CAN_DIS_STO ?? 0,
+    STOCK_DISPONIBLE: stockDisp,
+    detallesTelefono,
+    RESUMEN_VARIANTES: resumenVariantes,
   };
 }
+
+const fullInclude = [
+  { model: CATEGORIAS, as: "categoria", attributes: ["ID_CAT", "NOM_CAT"], required: false },
+  { model: MARCAS, as: "marca", attributes: ["ID_MAR", "NOM_MAR"], required: false },
+  { model: MODELOS, as: "modelo", attributes: ["ID_MOD", "NOM_MOD", "ID_MAR"], required: false },
+  { model: STOCK, as: "stock", required: false },
+  { model: PRECIOS, as: "precios", required: false },
+  { model: DET_TELE, as: "detallesTelefono", required: false },
+];
 
 export async function getAll(req, res) {
   try {
@@ -48,42 +169,43 @@ export async function getAll(req, res) {
     } else if (activo === "all") {
       // no filtrar por estado si se solicita all
     } else {
-      // Por defecto solo productos activos (no eliminados lógicamente)
       where.ACT_PRO = true;
     }
 
-    // Filtros por texto
-    const like = q ? `%${q}%` : null;
-    const include = [
-      { model: CATEGORIAS, as: "categoria", attributes: ["ID_CAT", "NOM_CAT"], required: false },
-      { model: MARCAS, as: "marca", attributes: ["ID_MAR", "NOM_MAR"], required: false },
-      { model: MODELOS, as: "modelo", attributes: ["ID_MOD", "NOM_MOD", "ID_MAR"], required: false },
-      { model: STOCK, as: "stock", required: false },
-      { model: PRECIOS, as: "precios", required: false },
-    ];
-
     const rows = await PRODUCTOS.findAll({
-      where: like
-        ? {
-          ...where,
-          [Op.or]: [
-            { COD_BAR_PRO: { [Op.like]: like } },
-            { IME_PRO: { [Op.like]: like } },
-            { DES_PRO: { [Op.like]: like } },
-            // Campos de las relaciones incluidas
-            { "$marca.NOM_MAR$": { [Op.like]: like } },
-            { "$modelo.NOM_MOD$": { [Op.like]: like } },
-          ],
-        }
-        : where,
-      include,
+      where,
+      include: fullInclude,
       order: [
         ["FEC_ING_PRO", "DESC"],
         ["ID_PRO", "DESC"],
       ],
     });
 
-    return res.json(rows.map(toUi));
+    let mapped = rows.map(toUi);
+
+    if (q && String(q).trim().length > 0) {
+      const term = String(q).trim().toLowerCase();
+      mapped = mapped.filter((p) => {
+        const matchBase =
+          String(p.ID_PRO).includes(term) ||
+          (p.NOMBRE || "").toLowerCase().includes(term) ||
+          (p.COD_BAR_PRO || "").toLowerCase().includes(term) ||
+          (p.DES_PRO || "").toLowerCase().includes(term) ||
+          (p.marca?.NOM_MAR || "").toLowerCase().includes(term) ||
+          (p.modelo?.NOM_MOD || "").toLowerCase().includes(term);
+
+        const matchPhoneUnit = (p.detallesTelefono || []).some(
+          (d) =>
+            (d.IME_TEL || "").toLowerCase().includes(term) ||
+            (d.COL_TEL || "").toLowerCase().includes(term) ||
+            (d.ALM_TEL || "").toLowerCase().includes(term)
+        );
+
+        return matchBase || matchPhoneUnit;
+      });
+    }
+
+    return res.json(mapped);
   } catch (error) {
     console.error("productos.getAll", error);
     return res.status(500).json({ error: "Internal server error" });
@@ -107,19 +229,17 @@ export async function create(req, res) {
   const file = req.file;
   console.log("POST /productos -> file?", !!file, "body keys:", Object.keys(body));
 
-  // Detección de doble click concurrente (mismos datos en < 3 segundos)
   cleanOldProductCreations();
   const dedupKey = `${body.ID_CAT}_${body.ID_MAR}_${body.ID_MOD || ""}_${(body.COD_BAR_PRO || "").trim()}_${(body.DES_PRO || "").trim()}_${body.PRECIO_VENTA || ""}`;
   const nowMs = Date.now();
   const lastCreation = recentProductCreations.get(dedupKey);
-  if (lastCreation && (nowMs - lastCreation.time < 3000)) {
+  if (lastCreation && nowMs - lastCreation.time < 3000) {
     console.warn(`[Anti-Doble-Click] Creación de producto duplicada bloqueada para "${body.DES_PRO || body.COD_BAR_PRO}"`);
     return res.status(200).json(toUi(lastCreation.product));
   }
 
   const t = await sequelize.transaction();
   try {
-    // Validaciones relacionales
     const [cat, mar, mod] = await Promise.all([
       CATEGORIAS.findByPk(body.ID_CAT, { transaction: t }),
       MARCAS.findByPk(body.ID_MAR, { transaction: t }),
@@ -144,7 +264,6 @@ export async function create(req, res) {
       }
     }
 
-    // Validar código de barras duplicado antes de insertar
     if (body.COD_BAR_PRO && String(body.COD_BAR_PRO).trim().length > 0) {
       const existingBar = await PRODUCTOS.findOne({
         where: { COD_BAR_PRO: String(body.COD_BAR_PRO).trim() },
@@ -156,42 +275,30 @@ export async function create(req, res) {
       }
     }
 
-    // Validar IMEI duplicado si fue provisto
-    if (body.IME_PRO && String(body.IME_PRO).trim().length > 0) {
-      const existingImei = await PRODUCTOS.findOne({
-        where: { IME_PRO: String(body.IME_PRO).trim() },
-        transaction: t,
-      });
-      if (existingImei) {
-        await t.rollback();
-        return res.status(400).json({ error: `Ya existe un producto con el IMEI "${body.IME_PRO}"` });
-      }
-    }
-
     const imgUrlToSave = file
       ? file.filename
-      : (body.IMG_URL && String(body.IMG_URL).trim().length > 0 ? String(body.IMG_URL).trim() : null);
+      : body.IMG_URL && String(body.IMG_URL).trim().length > 0
+      ? String(body.IMG_URL).trim()
+      : null;
 
     const created = await PRODUCTOS.create(
       {
         COD_BAR_PRO: body.COD_BAR_PRO ? String(body.COD_BAR_PRO).trim() : null,
-        IME_PRO: body.IME_PRO ? String(body.IME_PRO).trim() : null,
         ID_CAT: Number(body.ID_CAT),
         ID_MAR: Number(body.ID_MAR),
         ID_MOD: body.ID_MOD || null,
         DES_PRO: body.DES_PRO || null,
-        ORG_PRO: body.ORG_PRO, // COMPRA_NUEVA | PARTE_PAGO | CONSIGNACION
-        EST_PRO: body.EST_PRO, // NUEVO | USADO_EXCELENTE | USADO_BUENO | USADO_REGULAR
+        ORG_PRO: body.ORG_PRO || "COMPRA_NUEVA",
+        EST_PRO: body.EST_PRO || "NUEVO",
         FEC_ING_PRO: body.FEC_ING_PRO ? new Date(body.FEC_ING_PRO) : new Date(),
         ID_PRV: body.ID_PRV ? Number(body.ID_PRV) : null,
-        ACT_PRO: body.ACT_PRO !== undefined ? (String(body.ACT_PRO) === "true" || body.ACT_PRO === true) : true,
+        ACT_PRO: body.ACT_PRO !== undefined ? String(body.ACT_PRO) === "true" || body.ACT_PRO === true : true,
         FEC_MOD_PRO: new Date(),
         IMG_URL: imgUrlToSave,
       },
       { transaction: t }
     );
 
-    // Asegurar fila de stock
     await STOCK.create(
       {
         ID_PRO: created.ID_PRO,
@@ -204,7 +311,17 @@ export async function create(req, res) {
       { transaction: t }
     );
 
-    // Asegurar precio de venta en PRECIOS
+    // Si se enviaron unidades físicas de teléfono (DETALLES_TELEFONO), registrarlas y sincronizar STOCK
+    if (body.DETALLES_TELEFONO) {
+      await syncDetallesTelefonoList(
+        created.ID_PRO,
+        body.DETALLES_TELEFONO,
+        created.EST_PRO,
+        created.ORG_PRO,
+        t
+      );
+    }
+
     const precioVenta = Number(body.PRECIO_VENTA || body.PRECIO || body.VAL_PRE || 0);
     if (!isNaN(precioVenta) && precioVenta >= 0) {
       await PRECIOS.create(
@@ -218,52 +335,57 @@ export async function create(req, res) {
     }
 
     const withInclude = await PRODUCTOS.findByPk(created.ID_PRO, {
-      include: [
-        { model: CATEGORIAS, as: "categoria", attributes: ["ID_CAT", "NOM_CAT"] },
-        { model: MARCAS, as: "marca", attributes: ["ID_MAR", "NOM_MAR"] },
-        { model: MODELOS, as: "modelo", attributes: ["ID_MOD", "NOM_MOD", "ID_MAR"] },
-        { model: STOCK, as: "stock" },
-        { model: PRECIOS, as: "precios" },
-      ],
+      include: fullInclude,
       transaction: t,
     });
 
     await t.commit();
-
-    // Guardar en la caché de deduplicación para responder idempotentemente
     recentProductCreations.set(dedupKey, { time: nowMs, product: withInclude });
 
     return res.status(201).json(toUi(withInclude));
   } catch (error) {
     await t.rollback();
     console.error("productos.create", error);
-    if (error?.name === "SequelizeUniqueConstraintError") {
-      return res.status(409).json({ error: "Código de barras o identificador duplicado" });
+    if (error?.status) {
+      return res.status(error.status).json({ error: error.message });
     }
-    return res.status(500).json({ error: "Internal server error" });
+    if (error?.name === "SequelizeUniqueConstraintError") {
+      return res.status(409).json({ error: "Código de barras o IMEI duplicado" });
+    }
+    return res.status(500).json({ error: error?.message || "Internal server error" });
   }
 }
 
 export async function update(req, res) {
+  const t = await sequelize.transaction();
   try {
     const { id } = req.params;
     const body = req.body || {};
     const file = req.file;
     console.log("PUT /productos/:id -> file?", !!file, "body keys:", Object.keys(body));
-    const row = await PRODUCTOS.findByPk(id);
-    if (!row) return res.status(404).json({ error: "No encontrado" });
+    const row = await PRODUCTOS.findByPk(id, { transaction: t });
+    if (!row) {
+      await t.rollback();
+      return res.status(404).json({ error: "No encontrado" });
+    }
 
-    // Validaciones si cambian relaciones
     if (body.ID_MAR || body.ID_MOD) {
-      const mar = body.ID_MAR ? await MARCAS.findByPk(body.ID_MAR) : null;
-      const mod = body.ID_MOD ? await MODELOS.findByPk(body.ID_MOD) : null;
-      if (body.ID_MAR && !mar) return res.status(400).json({ error: "Marca inválida" });
-      if (body.ID_MOD && !mod) return res.status(400).json({ error: "Modelo inválido" });
+      const mar = body.ID_MAR ? await MARCAS.findByPk(body.ID_MAR, { transaction: t }) : null;
+      const mod = body.ID_MOD ? await MODELOS.findByPk(body.ID_MOD, { transaction: t }) : null;
+      if (body.ID_MAR && !mar) {
+        await t.rollback();
+        return res.status(400).json({ error: "Marca inválida" });
+      }
+      if (body.ID_MOD && !mod) {
+        await t.rollback();
+        return res.status(400).json({ error: "Modelo inválido" });
+      }
       const effMar = Number(body.ID_MAR ?? row.ID_MAR);
       const effMod = body.ID_MOD ?? row.ID_MOD;
       if (effMod) {
-        const checkMod = mod || (await MODELOS.findByPk(effMod));
+        const checkMod = mod || (await MODELOS.findByPk(effMod, { transaction: t }));
         if (checkMod && Number(checkMod.ID_MAR) !== effMar) {
+          await t.rollback();
           return res.status(400).json({ error: "El modelo no pertenece a la marca" });
         }
       }
@@ -281,58 +403,73 @@ export async function update(req, res) {
       nextImg = trimmed.length > 0 ? trimmed : null;
     }
 
-    await row.update({
-      COD_BAR_PRO: body.COD_BAR_PRO ?? row.COD_BAR_PRO,
-      IME_PRO: body.IME_PRO ?? row.IME_PRO,
-      ID_CAT: body.ID_CAT !== undefined ? Number(body.ID_CAT) : row.ID_CAT,
-      ID_MAR: body.ID_MAR !== undefined ? Number(body.ID_MAR) : row.ID_MAR,
-      ID_MOD: body.ID_MOD ?? row.ID_MOD,
-      DES_PRO: body.DES_PRO ?? row.DES_PRO,
-      ORG_PRO: body.ORG_PRO ?? row.ORG_PRO,
-      EST_PRO: body.EST_PRO ?? row.EST_PRO,
-      ID_PRV: body.ID_PRV !== undefined ? Number(body.ID_PRV) : row.ID_PRV,
-      ACT_PRO: body.ACT_PRO !== undefined ? (String(body.ACT_PRO) === "true" || body.ACT_PRO === true) : row.ACT_PRO,
-      FEC_MOD_PRO: new Date(),
-      IMG_URL: nextImg,
-    });
+    await row.update(
+      {
+        COD_BAR_PRO: body.COD_BAR_PRO ?? row.COD_BAR_PRO,
+        ID_CAT: body.ID_CAT !== undefined ? Number(body.ID_CAT) : row.ID_CAT,
+        ID_MAR: body.ID_MAR !== undefined ? Number(body.ID_MAR) : row.ID_MAR,
+        ID_MOD: body.ID_MOD ?? row.ID_MOD,
+        DES_PRO: body.DES_PRO ?? row.DES_PRO,
+        ORG_PRO: body.ORG_PRO ?? row.ORG_PRO,
+        EST_PRO: body.EST_PRO ?? row.EST_PRO,
+        ID_PRV: body.ID_PRV !== undefined ? Number(body.ID_PRV) : row.ID_PRV,
+        ACT_PRO: body.ACT_PRO !== undefined ? String(body.ACT_PRO) === "true" || body.ACT_PRO === true : row.ACT_PRO,
+        FEC_MOD_PRO: new Date(),
+        IMG_URL: nextImg,
+      },
+      { transaction: t }
+    );
+
+    if (body.DETALLES_TELEFONO !== undefined) {
+      await syncDetallesTelefonoList(
+        id,
+        body.DETALLES_TELEFONO,
+        row.EST_PRO,
+        row.ORG_PRO,
+        t
+      );
+    }
 
     if (nextImg !== prevImg && prevImg && !prevImg.startsWith("http://") && !prevImg.startsWith("https://")) {
       deleteIfExists(prevImg);
     }
 
-    // Actualizar o crear precio de venta en PRECIOS
     if (body.PRECIO_VENTA !== undefined || body.PRECIO !== undefined) {
       const nuevoPrecio = Number(body.PRECIO_VENTA ?? body.PRECIO);
       if (!isNaN(nuevoPrecio) && nuevoPrecio >= 0) {
         const precioExistente = await PRECIOS.findOne({
           where: { ID_PRO: id, TIP_PRE: "VENTA" },
+          transaction: t,
         });
         if (precioExistente) {
-          await precioExistente.update({ VAL_PRE: nuevoPrecio });
+          await precioExistente.update({ VAL_PRE: nuevoPrecio }, { transaction: t });
         } else {
-          await PRECIOS.create({
-            ID_PRO: Number(id),
-            TIP_PRE: "VENTA",
-            VAL_PRE: nuevoPrecio,
-          });
+          await PRECIOS.create(
+            {
+              ID_PRO: Number(id),
+              TIP_PRE: "VENTA",
+              VAL_PRE: nuevoPrecio,
+            },
+            { transaction: t }
+          );
         }
       }
     }
 
     const withInclude = await PRODUCTOS.findByPk(id, {
-      include: [
-        { model: CATEGORIAS, as: "categoria", attributes: ["ID_CAT", "NOM_CAT"] },
-        { model: MARCAS, as: "marca", attributes: ["ID_MAR", "NOM_MAR"] },
-        { model: MODELOS, as: "modelo", attributes: ["ID_MOD", "NOM_MOD", "ID_MAR"] },
-        { model: STOCK, as: "stock" },
-        { model: PRECIOS, as: "precios" },
-      ],
+      include: fullInclude,
+      transaction: t,
     });
 
+    await t.commit();
     return res.json(toUi(withInclude));
   } catch (error) {
+    await t.rollback();
     console.error("productos.update", error);
-    return res.status(500).json({ error: "Internal server error" });
+    if (error?.status) {
+      return res.status(error.status).json({ error: error.message });
+    }
+    return res.status(500).json({ error: error?.message || "Internal server error" });
   }
 }
 
@@ -342,7 +479,6 @@ export async function remove(req, res) {
     const row = await PRODUCTOS.findByPk(id);
     if (!row) return res.status(404).json({ error: "No encontrado" });
 
-    // Eliminación lógica: marcamos como inactivo para preservar la consistencia relacional e histórica
     await row.update({ ACT_PRO: false });
     return res.json({ message: "Producto eliminado correctamente", ID_PRO: row.ID_PRO });
   } catch (error) {

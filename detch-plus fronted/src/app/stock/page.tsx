@@ -45,11 +45,19 @@ export default function StockPage() {
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return activeItems.filter((r) => {
+      const matchPhoneUnit = (r.producto?.detallesTelefono || []).some(
+        (d) =>
+          (d.IME_TEL || "").toLowerCase().includes(term) ||
+          (d.COL_TEL || "").toLowerCase().includes(term) ||
+          (d.ALM_TEL || "").toLowerCase().includes(term)
+      );
+
       const matchesQ =
         !term ||
         r.producto?.nombre?.toLowerCase().includes(term) ||
         (r.producto?.codigo || "").toLowerCase().includes(term) ||
-        r.id.toString().includes(term);
+        r.id.toString().includes(term) ||
+        matchPhoneUnit;
 
       const matchesEstado =
         estado === "todos" ||

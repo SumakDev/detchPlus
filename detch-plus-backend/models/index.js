@@ -49,6 +49,17 @@ MODELOS.belongsTo(MARCAS, { foreignKey: "ID_MAR", as: "marca" });
 PRODUCTOS.hasOne(STOCK, { foreignKey: "ID_PRO", as: "stock", onDelete: "CASCADE" });
 STOCK.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });
 
+// Producto -> Detalles de Teléfono (1:N - cada fila representa una unidad física con su propio IMEI, color, almacenamiento y estado)
+PRODUCTOS.hasMany(DET_TELE, { foreignKey: "ID_PRO", as: "detallesTelefono", onDelete: "CASCADE" });
+DET_TELE.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });
+
+// Producto -> Detalle Reloj y Consola
+PRODUCTOS.hasOne(DET_REL, { foreignKey: "ID_PRO", as: "detalleReloj", onDelete: "CASCADE" });
+DET_REL.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });
+
+PRODUCTOS.hasOne(DET_CON, { foreignKey: "ID_PRO", as: "detalleConsola", onDelete: "CASCADE" });
+DET_CON.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });
+
 // Producto -> Precios (1:N)
 PRODUCTOS.hasMany(PRECIOS, { foreignKey: "ID_PRO", as: "precios", onDelete: "CASCADE" });
 PRECIOS.belongsTo(PRODUCTOS, { foreignKey: "ID_PRO", as: "producto" });

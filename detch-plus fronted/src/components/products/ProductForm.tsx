@@ -1,12 +1,40 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import ImageUploader from "./ImageUploader";
 import { fetchCategorias, fetchMarcas, fetchModelosByMarca } from "@/lib/api/catalogos";
-import { Link as LinkIcon, Upload, Trash2, CheckCircle2 } from "lucide-react";
+import type { DetalleTelefono, EstadoProducto, OrigenProducto, DisponibilidadTelefono } from "@/types/product";
+import { formatEstadoProducto } from "@/types/product";
+import {
+  Link as LinkIcon,
+  Upload,
+  Trash2,
+  CheckCircle2,
+  Plus,
+  Copy,
+  Smartphone,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+
+const STORAGE_OPTIONS = ["64GB", "128GB", "256GB", "512GB", "1TB"];
+const COLOR_SUGGESTIONS = [
+  "Negro",
+  "Blanco",
+  "Azul",
+  "Azul Medianoche",
+  "Dorado",
+  "Grafito",
+  "Plata",
+  "Rosa",
+  "Verde",
+  "Morado",
+  "Rojo",
+  "Titanio Natural",
+];
 
 export default function ProductForm({
   producto,
@@ -21,13 +49,12 @@ export default function ProductForm({
 }) {
   const [form, setForm] = useState({
     COD_BAR_PRO: "",
-    IME_PRO: "",
     ID_CAT: "" as number | "",
     ID_MAR: "" as number | "",
     ID_MOD: "" as string | "",
     DES_PRO: "",
-    ORG_PRO: "COMPRA_NUEVA",
-    EST_PRO: "NUEVO",
+    ORG_PRO: "COMPRA_NUEVA" as OrigenProducto,
+    EST_PRO: "NUEVO" as EstadoProducto,
     PRECIO_VENTA: "" as string | number,
     ACT_PRO: true,
     imageMode: "url" as "file" | "url",
@@ -35,6 +62,10 @@ export default function ProductForm({
     imageUrl: "",
     removeImage: false,
   });
+
+  const [detallesTelefono, setDetallesTelefono] = useState<DetalleTelefono[]>([]);
+  const [expandedDiagIndex, setExpandedDiagIndex] = useState<number | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const [categorias, setCategorias] = useState<Array<{ ID_CAT: number; NOM_CAT: string }>>([]);
   const [marcas, setMarcas] = useState<Array<{ ID_MAR: number; NOM_MAR: string }>>([]);
@@ -64,13 +95,12 @@ export default function ProductForm({
       const isHttp = /^https?:\/\//i.test(producto.IMG_URL || "");
       setForm({
         COD_BAR_PRO: producto.COD_BAR_PRO || "",
-        IME_PRO: producto.IME_PRO || "",
         ID_CAT: producto.ID_CAT ?? "",
         ID_MAR: producto.ID_MAR ?? "",
         ID_MOD: producto.ID_MOD ?? "",
         DES_PRO: producto.DES_PRO || "",
-        ORG_PRO: producto.ORG_PRO || "COMPRA_NUEVA",
-        EST_PRO: producto.EST_PRO || "NUEVO",
+        ORG_PRO: (producto.ORG_PRO || "COMPRA_NUEVA") as OrigenProducto,
+        EST_PRO: (producto.EST_PRO || "NUEVO") as EstadoProducto,
         PRECIO_VENTA: producto.PRECIO_VENTA !== undefined ? producto.PRECIO_VENTA : (producto.VAL_PRE ?? ""),
         ACT_PRO: producto.ACT_PRO !== undefined ? !!producto.ACT_PRO : true,
         imageMode: isHttp ? "url" : "file",
@@ -79,8 +109,107 @@ export default function ProductForm({
         removeImage: false,
       });
       setExistingImg(producto.IMG_URL);
+
+      if (Array.isArray(producto.detallesTelefono)) {
+        setDetallesTelefono(
+          producto.detallesTelefono.map((d: any) => ({
+            ID_DET_TEL: d.ID_DET_TEL,
+            ID_PRO: d.ID_PRO,
+            IME_TEL: d.IME_TEL || "",
+            COL_TEL: d.COL_TEL || "",
+            ALM_TEL: d.ALM_TEL || "128GB",
+            EST_FIS_TEL: (d.EST_FIS_TEL || producto.EST_PRO || "NUEVO") as EstadoProducto,
+            ORG_TEL: (d.ORG_TEL || producto.ORG_PRO || "COMPRA_NUEVA") as OrigenProducto,
+            EST_BAT_TEL: d.EST_BAT_TEL ?? 10,
+            EST_PAN_TEL: d.EST_PAN_TEL ?? 10,
+            EST_CAR_TEL: d.EST_CAR_TEL ?? 10,
+            EST_CAM_TEL: d.EST_CAM_TEL ?? 10,
+            EST_SOF_TEL: d.EST_SOF_TEL ?? 10,
+            ACC_INC_TEL: d.ACC_INC_TEL || "",
+            DIS_TEL: (d.DIS_TEL || "DISPONIBLE") as DisponibilidadTelefono,
+          }))
+        );
+      } else {
+        setDetallesTelefono([]);
+      }
     }
   }, [producto]);
+
+  const isPhoneCategory = useMemo(() => {
+    if (!form.ID_CAT) return false;
+    if (Number(form.ID_CAT) === 1) return true;
+    const found = categorias.find((c) => Number(c.ID_CAT) === Number(form.ID_CAT));
+    return found?.NOM_CAT?.toUpperCase() === "TELEFONO";
+  }, [form.ID_CAT, categorias]);
+
+  // Resumen en vivo de variantes agrupadas por Color + Almacenamiento + Estado
+  const liveVariantSummary = useMemo(() => {
+    const map = new Map<string, { color: string; almacenamiento: string; estado: string; disponibles: number; total: number }>();
+    for (const d of detallesTelefono) {
+      const color = (d.COL_TEL || "Sin color").trim() || "Sin color";
+      const alm = (d.ALM_TEL || "S/A").trim() || "S/A";
+      const est = d.EST_FIS_TEL || "NUEVO";
+      const key = `${color.toLowerCase()}__${alm.toLowerCase()}__${est}`;
+      if (!map.has(key)) {
+        map.set(key, { color, almacenamiento: alm, estado: est, disponibles: 0, total: 0 });
+      }
+      const item = map.get(key)!;
+      item.total += 1;
+      if ((d.DIS_TEL || "DISPONIBLE") === "DISPONIBLE") {
+        item.disponibles += 1;
+      }
+    }
+    return Array.from(map.values());
+  }, [detallesTelefono]);
+
+  const totalDisponiblesTel = useMemo(
+    () => detallesTelefono.filter((d) => (d.DIS_TEL || "DISPONIBLE") === "DISPONIBLE").length,
+    [detallesTelefono]
+  );
+
+  function addPhoneUnit() {
+    setDetallesTelefono((prev) => [
+      ...prev,
+      {
+        IME_TEL: "",
+        COL_TEL: "",
+        ALM_TEL: "128GB",
+        EST_FIS_TEL: form.EST_PRO || "NUEVO",
+        ORG_TEL: form.ORG_PRO || "COMPRA_NUEVA",
+        EST_BAT_TEL: 10,
+        EST_PAN_TEL: 10,
+        EST_CAR_TEL: 10,
+        EST_CAM_TEL: 10,
+        EST_SOF_TEL: 10,
+        ACC_INC_TEL: "",
+        DIS_TEL: "DISPONIBLE",
+      },
+    ]);
+  }
+
+  function duplicatePhoneUnit(index: number) {
+    const source = detallesTelefono[index];
+    if (!source) return;
+    setDetallesTelefono((prev) => [
+      ...prev.slice(0, index + 1),
+      {
+        ...source,
+        ID_DET_TEL: undefined,
+        IME_TEL: "", // El IMEI es único por teléfono físico
+        DIS_TEL: "DISPONIBLE",
+      },
+      ...prev.slice(index + 1),
+    ]);
+  }
+
+  function removePhoneUnit(index: number) {
+    setDetallesTelefono((prev) => prev.filter((_, i) => i !== index));
+    if (expandedDiagIndex === index) setExpandedDiagIndex(null);
+  }
+
+  function updatePhoneUnit(index: number, patch: Partial<DetalleTelefono>) {
+    setDetallesTelefono((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
     const { name, value, type } = e.target as any;
@@ -93,6 +222,27 @@ export default function ProductForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (submittingRef.current || isSubmitting) return;
+    setFormError(null);
+
+    // Validar que no haya IMEIs repetidos en el formulario
+    if (isPhoneCategory && detallesTelefono.length > 0) {
+      const seen = new Set<string>();
+      for (let i = 0; i < detallesTelefono.length; i++) {
+        const u = detallesTelefono[i];
+        const imei = (u.IME_TEL || "").trim();
+        if (imei) {
+          if (seen.has(imei.toLowerCase())) {
+            setFormError(`El IMEI "${imei}" está duplicado en la unidad #${i + 1}. Cada teléfono físico debe tener un IMEI único.`);
+            return;
+          }
+          seen.add(imei.toLowerCase());
+        }
+        if (!(u.COL_TEL || "").trim()) {
+          setFormError(`Por favor indica el color en la unidad de teléfono #${i + 1}.`);
+          return;
+        }
+      }
+    }
 
     try {
       submittingRef.current = true;
@@ -100,7 +250,6 @@ export default function ProductForm({
 
       const fd = new FormData();
       if (form.COD_BAR_PRO) fd.append("COD_BAR_PRO", form.COD_BAR_PRO);
-      if (form.IME_PRO) fd.append("IME_PRO", form.IME_PRO);
       fd.append("ID_CAT", String(form.ID_CAT));
       fd.append("ID_MAR", String(form.ID_MAR));
       if (form.ID_MOD) fd.append("ID_MOD", String(form.ID_MOD));
@@ -112,7 +261,10 @@ export default function ProductForm({
       }
       fd.append("ACT_PRO", String(!!form.ACT_PRO));
 
-      // Lógica híbrida para la imagen
+      if (isPhoneCategory) {
+        fd.append("DETALLES_TELEFONO", JSON.stringify(detallesTelefono));
+      }
+
       if (form.removeImage) {
         fd.append("removeImage", "true");
       } else if (form.imageMode === "file" && form.imageFile) {
@@ -122,6 +274,9 @@ export default function ProductForm({
       }
 
       await onSubmit(fd);
+    } catch (err: any) {
+      setFormError(err?.message || "Error al guardar el producto");
+      throw err;
     } finally {
       setIsSubmitting(false);
       submittingRef.current = false;
@@ -130,6 +285,12 @@ export default function ProductForm({
 
   return (
     <form onSubmit={submit} className="bg-white border rounded-lg p-4 space-y-4">
+      {formError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 font-medium">
+          {formError}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <div className="grid gap-2">
           <Label htmlFor="COD_BAR_PRO">Código/Barcode</Label>
@@ -154,8 +315,12 @@ export default function ProductForm({
           />
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="IME_PRO">IMEI (opcional)</Label>
-          <Input id="IME_PRO" name="IME_PRO" value={form.IME_PRO} onChange={handleChange} />
+          <Label>Origen por defecto</Label>
+          <select name="ORG_PRO" value={form.ORG_PRO} onChange={handleChange} className="border rounded px-2 py-2 text-sm">
+            <option value="COMPRA_NUEVA">Compra Nueva</option>
+            <option value="PARTE_PAGO">Parte de Pago</option>
+            <option value="CONSIGNACION">Consignación</option>
+          </select>
         </div>
         <div className="grid gap-2">
           <Label>Estado / Condición</Label>
@@ -204,6 +369,271 @@ export default function ProductForm({
         </div>
       </div>
 
+      {/* SECCIÓN 1:N UNIDADES INDIVIDUALES DE TELÉFONO (DET_TELE) */}
+      {isPhoneCategory && (
+        <div className="border border-blue-200 rounded-xl p-4 bg-blue-50/30 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-blue-600" />
+                <Label className="text-sm font-bold text-gray-900">
+                  Unidades Individuales de Teléfono (DET_TELE)
+                </Label>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-semibold">
+                  Stock disponible: {totalDisponiblesTel} {totalDisponiblesTel === 1 ? "unidad" : "unidades"}
+                </span>
+              </div>
+              <p className="text-xs text-gray-600 mt-0.5">
+                Cada fila representa un teléfono físico con su propio IMEI, color, almacenamiento y estado. El stock se sincroniza automáticamente.
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              onClick={addPhoneUnit}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5 mr-1" /> Agregar unidad física
+            </Button>
+          </div>
+
+          {/* Resumen agrupado por Color + Almacenamiento */}
+          {liveVariantSummary.length > 0 && (
+            <div className="bg-white border border-blue-100 rounded-lg p-2.5 space-y-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block">
+                Conteo por Color y Almacenamiento:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {liveVariantSummary.map((v, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 border border-slate-200 font-medium"
+                  >
+                    <span className="font-bold text-blue-700">{v.disponibles}x</span>
+                    <span>{v.color}</span>
+                    <span>•</span>
+                    <span className="font-mono font-semibold">{v.almacenamiento}</span>
+                    <span className="text-[10px] text-gray-500">({formatEstadoProducto(v.estado)})</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <datalist id="phone-colors-list">
+            {COLOR_SUGGESTIONS.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+
+          {detallesTelefono.length === 0 ? (
+            <div className="text-center py-6 bg-white rounded-lg border border-dashed border-gray-300 text-xs text-gray-500">
+              No hay unidades físicas registradas para este modelo de teléfono. Haz clic en{" "}
+              <button type="button" onClick={addPhoneUnit} className="text-blue-600 font-semibold underline">
+                + Agregar unidad física
+              </button>{" "}
+              para registrar IMEI, color y almacenamiento.
+            </div>
+          ) : (
+            <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+              {detallesTelefono.map((unit, idx) => {
+                const isExpanded = expandedDiagIndex === idx;
+                return (
+                  <div
+                    key={unit.ID_DET_TEL ? `id-${unit.ID_DET_TEL}` : `new-${idx}`}
+                    className="bg-white border border-gray-200 rounded-lg p-3 space-y-2.5 shadow-2xs"
+                  >
+                    <div className="flex items-center justify-between gap-2 border-b border-gray-100 pb-2">
+                      <span className="text-xs font-bold text-gray-700">
+                        Unidad #{idx + 1}{" "}
+                        {unit.ID_DET_TEL ? (
+                          <span className="text-[11px] font-mono text-gray-400 font-normal">
+                            (ID #{unit.ID_DET_TEL})
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded ml-1">
+                            Nueva
+                          </span>
+                        )}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedDiagIndex(isExpanded ? null : idx)}
+                          className="text-[11px] text-blue-600 hover:bg-blue-50 px-2 py-1 rounded inline-flex items-center gap-1 font-medium"
+                        >
+                          {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          Diagnóstico (Bat: {unit.EST_BAT_TEL ?? 10}/10)
+                        </button>
+                        <button
+                          type="button"
+                          title="Duplicar mismo color y almacenamiento para otra unidad"
+                          onClick={() => duplicatePhoneUnit(idx)}
+                          className="text-[11px] text-gray-600 hover:bg-gray-100 px-2 py-1 rounded inline-flex items-center gap-1"
+                        >
+                          <Copy className="w-3 h-3" /> Duplicar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removePhoneUnit(idx)}
+                          className="text-[11px] text-rose-600 hover:bg-rose-50 px-2 py-1 rounded inline-flex items-center gap-1"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2.5">
+                      <div>
+                        <Label className="text-[11px] text-gray-600">Color *</Label>
+                        <Input
+                          list="phone-colors-list"
+                          value={unit.COL_TEL || ""}
+                          onChange={(e) => updatePhoneUnit(idx, { COL_TEL: e.target.value })}
+                          placeholder="Ej. Azul, Negro..."
+                          className="h-8 text-xs"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[11px] text-gray-600">Almacenamiento *</Label>
+                        <select
+                          value={unit.ALM_TEL || "128GB"}
+                          onChange={(e) => updatePhoneUnit(idx, { ALM_TEL: e.target.value })}
+                          className="w-full h-8 border rounded px-2 text-xs bg-white"
+                        >
+                          {STORAGE_OPTIONS.map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <Label className="text-[11px] text-gray-600">IMEI (único)</Label>
+                        <Input
+                          value={unit.IME_TEL || ""}
+                          onChange={(e) => updatePhoneUnit(idx, { IME_TEL: e.target.value })}
+                          placeholder="3548910..."
+                          className="h-8 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[11px] text-gray-600">Estado Físico</Label>
+                        <select
+                          value={unit.EST_FIS_TEL || "NUEVO"}
+                          onChange={(e) => updatePhoneUnit(idx, { EST_FIS_TEL: e.target.value as EstadoProducto })}
+                          className="w-full h-8 border rounded px-2 text-xs bg-white"
+                        >
+                          <option value="NUEVO">Nuevo</option>
+                          <option value="USADO_EXCELENTE">Usado - Excelente</option>
+                          <option value="USADO_BUENO">Usado - Bueno</option>
+                          <option value="USADO_REGULAR">Usado - Regular</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label className="text-[11px] text-gray-600">Disponibilidad</Label>
+                        <select
+                          value={unit.DIS_TEL || "DISPONIBLE"}
+                          onChange={(e) => updatePhoneUnit(idx, { DIS_TEL: e.target.value as DisponibilidadTelefono })}
+                          className="w-full h-8 border rounded px-2 text-xs bg-white font-medium"
+                        >
+                          <option value="DISPONIBLE">Disponible (En Stock)</option>
+                          <option value="RESERVADO">Reservado</option>
+                          <option value="VENDIDO">Vendido</option>
+                          <option value="BAJA">De Baja</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="pt-2 border-t border-gray-100 bg-gray-50/70 rounded p-2.5 space-y-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+                          <div>
+                            <Label className="text-[10px] text-gray-500">Origen</Label>
+                            <select
+                              value={unit.ORG_TEL || "COMPRA_NUEVA"}
+                              onChange={(e) => updatePhoneUnit(idx, { ORG_TEL: e.target.value as OrigenProducto })}
+                              className="w-full h-7 border rounded px-1.5 text-xs bg-white"
+                            >
+                              <option value="COMPRA_NUEVA">Compra Nueva</option>
+                              <option value="PARTE_PAGO">Parte de Pago</option>
+                              <option value="CONSIGNACION">Consignación</option>
+                            </select>
+                          </div>
+                          <div>
+                            <Label className="text-[10px] text-gray-500">Batería (1-10)</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={10}
+                              value={unit.EST_BAT_TEL ?? 10}
+                              onChange={(e) => updatePhoneUnit(idx, { EST_BAT_TEL: Number(e.target.value) })}
+                              className="h-7 text-xs bg-white"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-[10px] text-gray-500">Pantalla (1-10)</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={10}
+                              value={unit.EST_PAN_TEL ?? 10}
+                              onChange={(e) => updatePhoneUnit(idx, { EST_PAN_TEL: Number(e.target.value) })}
+                              className="h-7 text-xs bg-white"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-[10px] text-gray-500">Carcasa (1-10)</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={10}
+                              value={unit.EST_CAR_TEL ?? 10}
+                              onChange={(e) => updatePhoneUnit(idx, { EST_CAR_TEL: Number(e.target.value) })}
+                              className="h-7 text-xs bg-white"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-[10px] text-gray-500">Cámara (1-10)</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={10}
+                              value={unit.EST_CAM_TEL ?? 10}
+                              onChange={(e) => updatePhoneUnit(idx, { EST_CAM_TEL: Number(e.target.value) })}
+                              className="h-7 text-xs bg-white"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-[10px] text-gray-500">Software (1-10)</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={10}
+                              value={unit.EST_SOF_TEL ?? 10}
+                              onChange={(e) => updatePhoneUnit(idx, { EST_SOF_TEL: Number(e.target.value) })}
+                              className="h-7 text-xs bg-white"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-gray-500">Accesorios Incluidos / Observaciones de la unidad</Label>
+                          <Input
+                            value={unit.ACC_INC_TEL || ""}
+                            onChange={(e) => updatePhoneUnit(idx, { ACC_INC_TEL: e.target.value })}
+                            placeholder="Ej. Caja original, cable USB-C, cargador 20W..."
+                            className="h-7 text-xs bg-white"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="grid gap-2">
         <Label htmlFor="DES_PRO">Descripción</Label>
         <textarea id="DES_PRO" name="DES_PRO" value={form.DES_PRO} onChange={handleChange} className="min-h-[80px] border rounded px-3 py-2 text-sm" />
@@ -217,12 +647,11 @@ export default function ProductForm({
             <p className="text-xs text-gray-500">Puedes pegar un enlace web directo o subir un archivo</p>
           </div>
 
-          {/* Toggle de Modo */}
-          <div className="flex items-center gap-1 bg-gray-200/70 p-1 rounded-lg self-start sm:self-auto">
+          <div className="inline-flex rounded-lg border border-gray-200 bg-gray-100 p-0.5 self-start">
             <button
               type="button"
               onClick={() => {
-                setForm((p) => ({ ...p, imageMode: "url", removeImage: false }));
+                setForm((p) => ({ ...p, imageMode: "url", imageFile: null, removeImage: false }));
               }}
               className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md transition ${
                 form.imageMode === "url"
@@ -248,7 +677,6 @@ export default function ProductForm({
           </div>
         </div>
 
-        {/* Input según el modo seleccionado */}
         {form.imageMode === "url" ? (
           <div className="space-y-2">
             <div className="relative">
@@ -272,7 +700,6 @@ export default function ProductForm({
               Ideal para imágenes alojadas en internet (Apple, Sony, Unsplash, Imgur, etc.). No se borran con reinicios de servidor.
             </p>
 
-            {/* Preview de URL */}
             {form.imageUrl.trim() && (
               <div className="flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-200">
                 <img
@@ -313,7 +740,6 @@ export default function ProductForm({
           />
         )}
 
-        {/* Imagen Actual (si existe en BD y no ha sido reemplazada ni borrada) */}
         {existingImg && !form.removeImage && (
           <div className="pt-2 border-t border-gray-200 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -381,8 +807,12 @@ export default function ProductForm({
           className="bg-gray-900 text-white hover:bg-gray-800 font-semibold transition"
         >
           {isSubmitting
-            ? (isEditing ? "Guardando cambios..." : "Creando producto...")
-            : (isEditing ? "Guardar cambios" : "Crear producto")}
+            ? isEditing
+              ? "Guardando cambios..."
+              : "Creando producto..."
+            : isEditing
+            ? "Guardar cambios"
+            : "Crear producto"}
         </Button>
       </div>
     </form>

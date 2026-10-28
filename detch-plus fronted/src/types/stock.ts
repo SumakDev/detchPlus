@@ -1,3 +1,5 @@
+import type { DetalleTelefono, ResumenVarianteTelefono } from "./product";
+
 // Datos crudos que llegan del backend (BD -> Front)
 export type StockDb = {
   ID_PRO: number;                 // PK del producto
@@ -11,8 +13,8 @@ export type StockDb = {
   // Si el backend hace include del producto:
   producto?: {
     ID_PRO: number;
+    ID_CAT?: number;
     COD_BAR_PRO?: string | null;
-    IME_PRO?: string | null;
     DES_PRO?: string | null;
     IMG_URL?: string | null;
     ACT_PRO?: boolean;
@@ -22,6 +24,8 @@ export type StockDb = {
     marca?: { ID_MAR: number; NOM_MAR: string };
     modelo?: { ID_MOD: string; NOM_MOD: string };
     categoria?: { ID_CAT: number; NOM_CAT: string };
+    detallesTelefono?: DetalleTelefono[];
+    RESUMEN_VARIANTES?: ResumenVarianteTelefono[];
   };
 };
 
@@ -44,16 +48,18 @@ export type StockItem = {
 
   // Datos del producto para mostrar
   producto?: {
+    idCat?: number;
     codigo?: string | null;       // COD_BAR_PRO
     nombre: string;               // Marca + Modelo o descripción/código
     marca?: string;
     modelo?: string;
     categoria?: string;
     img?: string | null;          // URL absoluta o relativa
-    imei?: string | null;
     descripcion?: string | null;
     activo?: boolean;
     estadoFisico?: string;
+    detallesTelefono?: DetalleTelefono[];
+    resumenVariantes?: ResumenVarianteTelefono[];
   };
 };
 
@@ -93,17 +99,19 @@ export function dbToUi(row: StockDb): StockItem {
     estado: computeEstado(disponible, minimo),
     producto: p
       ? {
-        codigo: p.COD_BAR_PRO || null,
-        nombre: computeNombre(p),
-        marca: p.marca?.NOM_MAR,
-        modelo: p.modelo?.NOM_MOD,
-        categoria: p.categoria?.NOM_CAT,
-        img: p.IMG_URL || null,
-        imei: p.IME_PRO || null,
-        descripcion: p.DES_PRO || null,
-        activo: p.ACT_PRO !== undefined ? p.ACT_PRO : true,
-        estadoFisico: p.EST_PRO || undefined,
-      }
+          idCat: p.ID_CAT ?? p.categoria?.ID_CAT,
+          codigo: p.COD_BAR_PRO || null,
+          nombre: computeNombre(p),
+          marca: p.marca?.NOM_MAR,
+          modelo: p.modelo?.NOM_MOD,
+          categoria: p.categoria?.NOM_CAT,
+          img: p.IMG_URL || null,
+          descripcion: p.DES_PRO || null,
+          activo: p.ACT_PRO !== undefined ? p.ACT_PRO : true,
+          estadoFisico: p.EST_PRO || undefined,
+          detallesTelefono: p.detallesTelefono || [],
+          resumenVariantes: p.RESUMEN_VARIANTES || [],
+        }
       : undefined,
   };
 }

@@ -1,6 +1,7 @@
 import { Op } from "sequelize";
 import sequelize from "../config/database.js";
-import { PRODUCTOS, STOCK, MOV_INV, MARCAS, MODELOS, CATEGORIAS } from "../models/index.js";
+import { PRODUCTOS, STOCK, MOV_INV, MARCAS, MODELOS, CATEGORIAS, DET_TELE } from "../models/index.js";
+import { computePhoneVariantsSummary } from "./det_tele.controller.js";
 
 // Helpers
 function ensure(cond, message, status = 400) {
@@ -51,23 +52,44 @@ export async function getAll(req, res) {
             { model: CATEGORIAS, as: "categoria", attributes: ["ID_CAT", "NOM_CAT"], required: false },
             { model: MARCAS, as: "marca", attributes: ["ID_MAR", "NOM_MAR"], required: false },
             { model: MODELOS, as: "modelo", attributes: ["ID_MOD", "NOM_MOD"], required: false },
+            { model: DET_TELE, as: "detallesTelefono", required: false },
           ],
         },
       ],
       order: [["FEC_ACT_STO", "DESC"]],
     });
 
-    let data = rows.map((r) => r.get({ plain: true }));
+    let data = rows.map((r) => {
+      const plain = r.get({ plain: true });
+      if (plain.producto) {
+        const detalles = Array.isArray(plain.producto.detallesTelefono) ? plain.producto.detallesTelefono : [];
+        plain.producto.RESUMEN_VARIANTES = computePhoneVariantsSummary(detalles);
+        const isPhone =
+          Number(plain.producto.ID_CAT) === 1 ||
+          plain.producto.categoria?.NOM_CAT?.toUpperCase() === "TELEFONO";
+        if (isPhone && detalles.length > 0) {
+          plain.CAN_DIS_STO = detalles.filter((d) => (d.DIS_TEL || "DISPONIBLE") === "DISPONIBLE").length;
+          plain.CAN_RES_STO = detalles.filter((d) => d.DIS_TEL === "RESERVADO").length;
+        }
+      }
+      return plain;
+    });
     if (q) {
       const t = String(q).toLowerCase();
       data = data.filter((r) => {
         const p = r.producto || {};
+        const matchDet = (p.detallesTelefono || []).some(
+          (d) =>
+            (d.IME_TEL || "").toLowerCase().includes(t) ||
+            (d.COL_TEL || "").toLowerCase().includes(t) ||
+            (d.ALM_TEL || "").toLowerCase().includes(t)
+        );
         return (
           String(r.ID_PRO).includes(t) ||
           (p.COD_BAR_PRO || "").toLowerCase().includes(t) ||
-          (p.IME_PRO || "").toLowerCase().includes(t) ||
           (p.marca?.NOM_MAR || "").toLowerCase().includes(t) ||
-          (p.modelo?.NOM_MOD || "").toLowerCase().includes(t)
+          (p.modelo?.NOM_MOD || "").toLowerCase().includes(t) ||
+          matchDet
         );
       });
     }

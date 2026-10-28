@@ -9,7 +9,7 @@ export default function ProductUpsertDialog({
   onOpenChange,
   producto,
   isEditing,
-  onSubmit, // (form: FormData) => Promise<void> | void
+  onSubmit,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -33,7 +33,7 @@ export default function ProductUpsertDialog({
         onOpenChange(o);
       }}
     >
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Editar producto" : "Agregar producto"}</DialogTitle>
         </DialogHeader>
