@@ -177,9 +177,9 @@ export default function StockTable({
                           Ajustar cantidad
                         </Button>
                       )}
-                      <Button variant="outline" size="sm" onClick={() => onUpdateMin(r)} className="text-xs">
+                      {/* <Button variant="outline" size="sm" onClick={() => onUpdateMin(r)} className="text-xs">
                         Mínimo
-                      </Button>
+                      </Button> */}
                     </div>
                   </td>
                 </tr>
